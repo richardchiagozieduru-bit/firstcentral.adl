@@ -251,23 +251,32 @@
 
   .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.5rem;
     margin-bottom: 2rem;
   }
 
+  @media (max-width: 992px) {
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .stat-card {
-    background: white;
+    background: linear-gradient(135deg, #ccd9f0 0%, #fddbb8 100%);
     padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-    border: 1px solid #e9ecef;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
 
   .stat-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.12);
   }
 
   .stat-header {
@@ -278,60 +287,125 @@
   }
 
   .stat-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
+    font-size: 1.25rem;
     color: white;
   }
 
-  .stat-icon.today { background: linear-gradient(135deg, #667eea, #764ba2); }
-  .stat-icon.week { background: linear-gradient(135deg, #f093fb, #f5576c); }
-  .stat-icon.month { background: linear-gradient(135deg, #4facfe, #00f2fe); }
-  .stat-icon.success { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+  .stat-icon.filing { background: linear-gradient(135deg, #1B3D8C, #143170); box-shadow: 0 4px 12px rgba(27, 61, 140, 0.25); }
+  .stat-icon.volume { background: linear-gradient(135deg, #F47920, #d95e09); box-shadow: 0 4px 12px rgba(244, 121, 32, 0.25); }
+  .stat-icon.quality { background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25); }
+
+  .stat-status-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .stat-status-badge.bg-success { background-color: #d1fae5 !important; color: #065f46 !important; }
+  .stat-status-badge.bg-primary { background-color: #dbeafe !important; color: #1e40af !important; }
+  .stat-status-badge.bg-warning { background-color: #fef3c7 !important; color: #92400e !important; }
+  .stat-status-badge.bg-danger { background-color: #fee2e2 !important; color: #991b1b !important; }
 
   .stat-value {
-    font-size: 2rem;
+    font-size: 1.85rem;
     font-weight: 700;
-    color: #2c3e50;
+    color: #12263a;
     margin: 0;
+    line-height: 1.2;
   }
 
   .stat-label {
-    color: #6c757d;
-    font-size: 0.9rem;
-    margin: 0;
+    color: #334155;
+    font-size: 0.85rem;
+    margin-top: 5px;
+    margin-bottom: 0;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    font-weight: 600;
   }
 
   .stat-change {
-    font-size: 0.8rem;
-    margin-top: 0.5rem;
+    font-size: 0.82rem;
+    margin-top: 0.75rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    color: #475569;
   }
 
   .stat-change.positive {
-    color: #28a745;
+    color: #059669;
   }
 
   .stat-change.negative {
-    color: #dc3545;
+    color: #dc2626;
+  }
+
+
+  /* Table Custom Badges */
+  .period-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #ffffff;
+    color: #1B3D8C;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.88rem;
+    border: 1px solid rgba(27, 61, 140, 0.15);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  .clean-rate-text {
+    font-weight: 700;
+    color: #059669;
+    font-size: 0.92rem;
+  }
+
+  .exclusion-tag {
+    display: inline-block;
+    color: #dc2626;
+    background: #fef2f2;
+    border: 1px solid #fee2e2;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 3px;
+  }
+
+  .unmatched-tag {
+    display: inline-block;
+    color: #d97706;
+    background: #fffbeb;
+    border: 1px solid #fef3c7;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 3px;
   }
 
   .dashboard-section {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-    border: 1px solid #e9ecef;
+    background: linear-gradient(135deg, #ccd9f0 0%, #fddbb8 100%);
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     margin-bottom: 2rem;
   }
 
   .section-header {
     padding: 1.5rem;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -358,9 +432,12 @@
     overflow-y: auto;
     max-height: 400px;
     -webkit-overflow-scrolling: touch;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
     position: relative;
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
   }
 
   /* Custom scrollbar styling for better UX */
@@ -388,25 +465,33 @@
   .uploads-table thead {
     position: sticky;
     top: 0;
-    background-color: #f8f9fa;
+    background-color: rgba(235, 242, 252, 0.95);
     z-index: 10;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
 
   .uploads-table th,
   .uploads-table td {
     padding: 0.75rem;
     text-align: left;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   }
 
   .uploads-table th {
-    background-color: #f8f9fa;
+    background-color: rgba(235, 242, 252, 0.95);
     font-weight: 600;
-    color: #495057;
+    color: #1e293b;
     font-size: 0.875rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+  }
+
+  .uploads-table tbody tr {
+    transition: background-color 0.15s ease;
+  }
+
+  .uploads-table tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.45);
   }
 
   .status-badge {
@@ -466,21 +551,23 @@
   }
 
   .refresh-btn {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: #1B3D8C;
     color: white;
     border: none;
     padding: 0.5rem 1rem;
     border-radius: 6px;
     font-size: 0.875rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
+    box-shadow: 0 2px 6px rgba(27, 61, 140, 0.2);
   }
 
   .refresh-btn:hover {
     transform: translateY(-1px);
-    background: #D4620D;
+    background: #F47920;
     color: white;
-    box-shadow: 0 4px 12px rgba(212, 98, 13, 0.3);
+    box-shadow: 0 4px 12px rgba(244, 121, 32, 0.35);
   }
 
   .empty-state {
@@ -797,10 +884,9 @@
     }
     
     .stats-grid {
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 2.5rem;
       max-width: 1400px;
-      
     }
     
     .content-wrapper {
@@ -982,16 +1068,20 @@
   z-index: 1000;
   opacity: 1;
   transition: opacity 0.3s ease;
-  border-left: 4px solid #007bff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
 }
 
 .notification-success {
-  border-left-color: #28a745;
+  border-color: #bbf7d0;
+  background-color: #f0fdf4;
 }
 
 .notification-error {
-  border-left-color: #dc3545;
+  border-color: #fecaca;
+  background-color: #fef2f2;
 }
+
 
 .notification-content {
   display: flex;
@@ -1127,127 +1217,132 @@
         </div>
     </div>
 
-    <!-- Upload Statistics Cards -->
+
+    <!-- 3 Monthly Metric Cards -->
     <div class="stats-grid">
+        <!-- Card 1: Monthly Filing Status -->
         <div class="stat-card">
-            <div class="stat-header">
-                <div class="stat-icon today">
-                    <i class="fas fa-calendar-day"></i>
+            <div>
+                <div class="stat-header">
+                    <div class="stat-icon filing">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <span class="stat-status-badge bg-{{ filing_status.color }}" id="filing-badge">
+                        {{ filing_status.display }}
+                    </span>
                 </div>
+                <h3 class="stat-value" id="filing-cycle">{{ filing_status.cycle }}</h3>
+                <p class="stat-label">Current Filing Cycle</p>
             </div>
-            <h3 class="stat-value" id="today-uploads">{{ today_stats.total_uploads }}</h3>
-            <p class="stat-label">Today's Uploads</p>
-            <div class="stat-change positive">
-                <i class="fas fa-arrow-up"></i> {{ today_stats.successful_uploads }} successful
+            <div class="stat-change" id="filing-subtext">
+                <i class="fas fa-info-circle me-1"></i>{{ filing_status.subtext }}
             </div>
         </div>
 
+        <!-- Card 2: Portfolio Volume -->
         <div class="stat-card">
-            <div class="stat-header">
-                <div class="stat-icon week">
-                    <i class="fas fa-calendar-week"></i>
+            <div>
+                <div class="stat-header">
+                    <div class="stat-icon volume">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <span class="stat-status-badge bg-primary" id="portfolio-period-badge">
+                        {{ portfolio_volume.period_label }}
+                    </span>
                 </div>
+                <h3 class="stat-value" id="portfolio-total-records">{{ portfolio_volume.total_records }}</h3>
+                <p class="stat-label">Total Portfolio Records</p>
             </div>
-            <h3 class="stat-value" id="weekly-uploads">{{ weekly_stats.total_uploads }}</h3>
-            <p class="stat-label">Weekly Total</p>
-            <div class="stat-change positive">
-                <i class="fas fa-chart-line"></i> {{ weekly_stats.total_records_processed }} records processed
+            <div class="stat-change positive" id="portfolio-breakdown">
+                <i class="fas fa-user me-1"></i><span id="portfolio-individual">{{ portfolio_volume.individual_records }}</span> Indiv &nbsp;·&nbsp;
+                <i class="fas fa-building me-1"></i><span id="portfolio-corporate">{{ portfolio_volume.corporate_records }}</span> Corp
             </div>
         </div>
 
+        <!-- Card 3: Data Quality & Acceptance Rate -->
         <div class="stat-card">
-            <div class="stat-header">
-                <div class="stat-icon month">
-                    <i class="fas fa-calendar-alt"></i>
+            <div>
+                <div class="stat-header">
+                    <div class="stat-icon quality">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <span class="stat-status-badge {% if data_quality.has_exclusions %}bg-danger{% else %}bg-success{% endif %}" id="quality-badge">
+                        {% if data_quality.has_exclusions %}Action Needed{% else %}Verified Clean{% endif %}
+                    </span>
                 </div>
+                <h3 class="stat-value" id="data-quality-rate">{{ data_quality.clean_rate|floatformat:1 }}%</h3>
+                <p class="stat-label">Clean Acceptance Rate</p>
             </div>
-            <h3 class="stat-value" id="monthly-uploads">{{ monthly_stats.total_uploads }}</h3>
-            <p class="stat-label">Monthly Summary</p>
-            <div class="stat-change positive">
-                <i class="fas fa-users"></i> {{ monthly_stats.individual_records }} individual, {{ monthly_stats.corporate_records }} corporate
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-header">
-                <div class="stat-icon success">
-                    <i class="fas fa-check-circle"></i>
-                </div>
-            </div>
-            <h3 class="stat-value" id="success-rate">{{ overall_stats.success_rate|floatformat:1 }}%</h3>
-            <p class="stat-label">Success Rate</p>
-            <div class="stat-change positive">
-                <i class="fas fa-thumbs-up"></i> {{ overall_stats.successful_uploads }}/{{ overall_stats.total_uploads }} uploads
+            <div class="stat-change {% if data_quality.has_exclusions %}negative{% else %}positive{% endif %}" id="quality-subtext">
+                {% if data_quality.has_exclusions %}
+                    <i class="fas fa-exclamation-triangle me-1"></i>{{ data_quality.subtext }}
+                {% else %}
+                    <i class="fas fa-check-circle me-1"></i>{{ data_quality.subtext }}
+                {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- Recent Uploads Table -->
+    <!-- Monthly Submission Ledger & Audit Archive -->
     <div class="dashboard-section">
         <div class="section-header">
-            <h3 class="section-title"><i class="fas fa-history"></i> Recent Uploads</h3>
+            <h3 class="section-title">
+                <i class="fas fa-book-open text-primary me-2"></i> Monthly Submission Ledger &amp; Audit Archive
+            </h3>
             <button class="refresh-btn" onclick="refreshDashboard()">
-                <i class="fas fa-sync-alt"></i> Refresh
+                <i class="fas fa-sync-alt"></i> Refresh Ledger
             </button>
         </div>
         <div class="section-content">
 
-            {% if recent_uploads %}
+            {% if monthly_ledger %}
                 <div class="table-container">
                     <table class="uploads-table" id="uploads-table">
                     <thead>
                         <tr>
-                            <th>File Name</th>
-                            <th>Upload Time</th>
-                            <th>Status</th>
-                            <th>Records</th>
-                            <th>Processing Time</th>
-                            <th>Actions</th>
+                            <th>Reporting Period</th>
+                            <th>Submission Date &amp; Uploader</th>
+                            <th>Source File</th>
+                            <th>Portfolio Breakdown</th>
+                            <th>Data Quality</th>
+                            <th>Filing Status</th>
+                            <th style="text-align: right;">Audit Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for upload in recent_uploads %}
+                        {% for item in monthly_ledger %}
                         <tr>
                             <td>
-                                <i class="fas fa-file-excel"></i>
-                                {{ upload.original_filename }}
-                            </td>
-                            <td>{{ upload.uploaded_at|date:"M d, Y H:i" }}</td>
-                            <td>
-                                <span class="status-badge status-{{ upload.status }}">
-                                    {% if upload.status == 'completed' %}
-                                        <i class="fas fa-check"></i>
-                                    {% elif upload.status == 'processing' %}
-                                        <i class="fas fa-spinner fa-spin"></i>
-                                    {% elif upload.status == 'pending' %}
-                                        <i class="fas fa-clock"></i>
-                                    {% elif upload.status == 'awaiting_verification' %}
-                                        <i class="fas fa-user-check"></i>
-                                    {% elif upload.status == 'cancelled' %}
-                                        <i class="fas fa-ban"></i>
-                                    {% elif upload.status == 'failed' %}
-                                        <i class="fas fa-times"></i>
-                                    {% else %}
-                                        <i class="fas fa-question"></i>
-                                    {% endif %}
-                                    {{ upload.get_status_display }}
+                                <span class="period-badge">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    {{ item.period_display }}
                                 </span>
                             </td>
                             <td>
-                                {% if upload.total_records %}
+                                <div>
+                                    <strong>{{ item.session.uploaded_at|date:"M d, Y H:i" }}</strong>
+                                    <br>
+                                    <small class="text-muted"><i class="fas fa-user me-1"></i>{{ item.session.user.username|default:"System" }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    <i class="fas fa-file-excel text-success me-1"></i>
+                                    <span title="{{ item.session.original_filename }}">
+                                        {{ item.session.original_filename|truncatechars:32 }}
+                                    </span>
+                                    {% if item.session.processing_time %}
+                                        <br><small class="text-muted"><i class="fas fa-stopwatch me-1"></i>{{ item.session.processing_time|floatformat:1 }}s</small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if item.session.total_records %}
                                     <div>
-                                        <strong>{{ upload.total_records }}</strong> total
+                                        <strong>{{ item.session.total_records }}</strong> total
                                         <br>
                                         <small class="text-muted">
-                                            {{ upload.individual_records }} individual, {{ upload.corporate_records }} corporate
-                                            {% with total_excluded=upload.excluded_individual_records|default:0|add:upload.excluded_corporate_records|default:0 %}
-                                                {% if total_excluded > 0 %}
-                                                    <br><span style="color: #dc3545;">{{ total_excluded }} excluded records</span>
-                                                {% endif %}
-                                            {% endwith %}
-                                            {% if upload.unmatched_credit_records > 0 %}
-                                                <br><span style="color: #dc3545;">{{ upload.unmatched_credit_records }} unmatched credit</span>
-                                            {% endif %}
+                                            {{ item.session.individual_records }} Indiv &nbsp;·&nbsp; {{ item.session.corporate_records }} Corp
                                         </small>
                                     </div>
                                 {% else %}
@@ -1255,39 +1350,71 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if upload.processing_time %}
-                                    {{ upload.processing_time|floatformat:1 }}s
+                                {% if item.clean_rate is not None %}
+                                    <div>
+                                        <span class="clean-rate-text">{{ item.clean_rate|floatformat:1 }}% clean</span>
+                                        {% if item.total_excluded > 0 %}
+                                            <br><span class="exclusion-tag"><i class="fas fa-exclamation-circle me-1"></i>{{ item.total_excluded }} Excluded</span>
+                                        {% endif %}
+                                        {% if item.session.unmatched_credit_records > 0 %}
+                                            <br><span class="unmatched-tag"><i class="fas fa-question-circle me-1"></i>{{ item.session.unmatched_credit_records }} Unmatched</span>
+                                        {% endif %}
+                                    </div>
                                 {% else %}
                                     <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <div style="display: flex; gap: 4px;">
-                                    {% if upload.status == 'processing' or upload.status == 'pending' or upload.status == 'completed' or upload.status == 'failed' %}
-                                    <a href="{% url 'auto:progress_tracking' upload.id %}"
-                                       class="btn-view" title="View progress">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    {% elif upload.status == 'awaiting_verification' %}
-                                    <a href="{% url 'auto:verify_split_decision' %}?session_id={{ upload.id }}"
-                                       class="btn-view" title="Go to verification">
+                                <span class="status-badge status-{{ item.session.status }}">
+                                    {% if item.session.status == 'completed' %}
+                                        <i class="fas fa-check"></i>
+                                    {% elif item.session.status == 'processing' or item.session.status == 'finalizing' %}
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                    {% elif item.session.status == 'pending' or item.session.status == 'uploading' %}
+                                        <i class="fas fa-clock"></i>
+                                    {% elif item.session.status == 'awaiting_verification' %}
                                         <i class="fas fa-user-check"></i>
-                                    </a>
+                                    {% elif item.session.status == 'invalidated' %}
+                                        <i class="fas fa-lock-open"></i>
+                                    {% elif item.session.status == 'cancelled' %}
+                                        <i class="fas fa-ban"></i>
+                                    {% elif item.session.status == 'failed' %}
+                                        <i class="fas fa-times"></i>
+                                    {% else %}
+                                        <i class="fas fa-question"></i>
                                     {% endif %}
-                                    {% if upload.status not in 'completed,cancelled' %}
-                                    <button class="btn-cancel" 
-                                            data-upload-id="{{ upload.id }}" 
-                                            data-filename="{{ upload.original_filename }}"
-                                            title="Cancel upload">
-                                        <i class="fas fa-times-circle"></i>
-                                    </button>
+                                    {{ item.session.get_status_display }}
+                                </span>
+                            </td>
+                            <td style="text-align: right;">
+                                <div style="display: inline-flex; gap: 6px; justify-content: flex-end;">
+                                    {% if item.session.status == 'completed' %}
+                                        <a href="{% url 'auto:progress_tracking' item.session.id %}"
+                                           class="btn-view" title="View Processing Report &amp; Output">
+                                            <i class="fas fa-eye me-1"></i> Report
+                                        </a>
+                                    {% elif item.session.status == 'awaiting_verification' %}
+                                        <a href="{% url 'auto:verify_split_decision' %}?session_id={{ item.session.id }}"
+                                           class="btn-view" style="background: #8b5cf6;" title="Human Verification Required">
+                                            <i class="fas fa-user-check me-1"></i> Verify
+                                        </a>
+                                    {% elif item.session.status in 'processing,uploading,finalizing' %}
+                                        <a href="{% url 'auto:progress_tracking' item.session.id %}"
+                                           class="btn-view" title="View Live Progress">
+                                            <i class="fas fa-spinner fa-spin me-1"></i> Progress
+                                        </a>
+                                        <button class="btn-cancel" 
+                                                data-upload-id="{{ item.session.id }}" 
+                                                data-filename="{{ item.session.original_filename }}"
+                                                title="Cancel In-Progress Upload">
+                                            <i class="fas fa-times-circle"></i>
+                                        </button>
+                                    {% elif item.session.status == 'invalidated' %}
+                                        <a href="{% url 'auto:upload' %}"
+                                           class="btn-view" style="background: #F47920;" title="Re-upload Revised File">
+                                            <i class="fas fa-upload me-1"></i> Re-upload
+                                        </a>
                                     {% endif %}
-                                    <button class="btn-delete" 
-                                            data-upload-id="{{ upload.id }}" 
-                                            data-filename="{{ upload.original_filename }}"
-                                            title="Delete upload">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -1297,11 +1424,11 @@
                 </div>
             {% else %}
                 <div class="empty-state">
-                    <i class="fas fa-upload"></i>
-                    <h4>No uploads yet</h4>
-                    <p>Start by uploading your first Excel file to see statistics here.</p>
+                    <i class="fas fa-book-open"></i>
+                    <h4>No Monthly Submissions Found</h4>
+                    <p>Submit your organization's first monthly credit data batch to initiate the audit archive.</p>
                     <a href="{% url 'auto:upload' %}" class="btn btn-primary">
-                        <i class="fas fa-upload"></i> Upload File
+                        <i class="fas fa-upload"></i> Upload Monthly File
                     </a>
                 </div>
             {% endif %}
@@ -1324,12 +1451,61 @@ function refreshDashboard() {
     fetch('{% url "auto:dashboard_api" %}')
         .then(response => response.json())
         .then(data => {
-            // Update statistics cards
-            updateStatCard('today-uploads', data.stats.total_uploads);
-            updateStatCard('success-rate', data.stats.success_rate.toFixed(1) + '%');
+            // Update Card 1: Filing Status
+            if (data.status_metric) {
+                const filingBadge = document.getElementById('filing-badge');
+                if (filingBadge) {
+                    filingBadge.className = `stat-status-badge bg-${data.status_metric.color}`;
+                    filingBadge.textContent = data.status_metric.display;
+                }
+                updateStatCard('filing-cycle', data.status_metric.cycle);
+                const subtextEl = document.getElementById('filing-subtext');
+                if (subtextEl) {
+                    subtextEl.innerHTML = `<i class="fas fa-info-circle me-1"></i>${data.status_metric.subtext}`;
+                }
+            }
+
+            // Update Card 2: Portfolio Volume
+            if (data.volume_metric) {
+                updateStatCard('portfolio-total-records', data.volume_metric.total_records);
+                const periodBadge = document.getElementById('portfolio-period-badge');
+                if (periodBadge) periodBadge.textContent = data.volume_metric.period_label;
+                const indEl = document.getElementById('portfolio-individual');
+                if (indEl) indEl.textContent = data.volume_metric.individual_records;
+                const corpEl = document.getElementById('portfolio-corporate');
+                if (corpEl) corpEl.textContent = data.volume_metric.corporate_records;
+            }
+
+            // Update Card 3: Data Quality
+            if (data.quality_metric) {
+                updateStatCard('data-quality-rate', data.quality_metric.clean_rate.toFixed(1) + '%');
+                const qBadge = document.getElementById('quality-badge');
+                const qSub = document.getElementById('quality-subtext');
+                if (data.quality_metric.excluded_records > 0 || data.quality_metric.unmatched_records > 0) {
+                    if (qBadge) {
+                        qBadge.className = 'stat-status-badge bg-danger';
+                        qBadge.textContent = 'Action Needed';
+                    }
+                    if (qSub) {
+                        qSub.className = 'stat-change negative';
+                        qSub.innerHTML = `<i class="fas fa-exclamation-triangle me-1"></i>${data.quality_metric.subtext}`;
+                    }
+                } else {
+                    if (qBadge) {
+                        qBadge.className = 'stat-status-badge bg-success';
+                        qBadge.textContent = 'Verified Clean';
+                    }
+                    if (qSub) {
+                        qSub.className = 'stat-change positive';
+                        qSub.innerHTML = `<i class="fas fa-check-circle me-1"></i>${data.quality_metric.subtext}`;
+                    }
+                }
+            }
             
-            // Update recent uploads table
-            updateUploadsTable(data.recent_uploads);
+            // Update Monthly Ledger table
+            if (data.ledger) {
+                updateLedgerTable(data.ledger);
+            }
             
             console.log('Dashboard updated:', data.timestamp);
         })
@@ -1337,7 +1513,6 @@ function refreshDashboard() {
             console.error('Error refreshing dashboard:', error);
         })
         .finally(() => {
-            // Restore button state
             refreshBtn.innerHTML = originalContent;
             refreshBtn.disabled = false;
         });
@@ -1347,7 +1522,6 @@ function updateStatCard(elementId, value) {
     const element = document.getElementById(elementId);
     if (element) {
         element.textContent = value;
-        // Add a subtle animation
         element.style.transform = 'scale(1.05)';
         setTimeout(() => {
             element.style.transform = 'scale(1)';
@@ -1355,56 +1529,87 @@ function updateStatCard(elementId, value) {
     }
 }
 
-function updateUploadsTable(uploads) {
+function updateLedgerTable(ledger) {
     const tableBody = document.querySelector('#uploads-table tbody');
-    if (!tableBody || !uploads.length) return;
+    if (!tableBody || !ledger.length) return;
     
-    // Clear existing rows
     tableBody.innerHTML = '';
     
-    // Add new rows
-    uploads.forEach(upload => {
+    ledger.forEach(item => {
         const row = document.createElement('tr');
-        const uploadDate = new Date(upload.uploaded_at);
-        const statusClass = `status-${upload.status}`;
+        const statusClass = `status-${item.status}`;
+        
+        let exclTag = '';
+        if (item.excluded_records > 0) {
+            exclTag = `<br><span class="exclusion-tag"><i class="fas fa-exclamation-circle me-1"></i>${item.excluded_records} Excluded</span>`;
+        }
+        let unmatchTag = '';
+        if (item.unmatched_records > 0) {
+            unmatchTag = `<br><span class="unmatched-tag"><i class="fas fa-question-circle me-1"></i>${item.unmatched_records} Unmatched</span>`;
+        }
+        
+        let actionsHtml = '';
+        if (item.status === 'completed') {
+            actionsHtml = `<a href="/auto/progress/${item.id}/" class="btn-view" title="View Processing Report"><i class="fas fa-eye me-1"></i> Report</a>`;
+        } else if (item.status === 'awaiting_verification') {
+            actionsHtml = `<a href="/auto/verify-split-decision/?session_id=${item.id}" class="btn-view" style="background: #8b5cf6;" title="Human Verification Required"><i class="fas fa-user-check me-1"></i> Verify</a>`;
+        } else if (['processing', 'uploading', 'finalizing'].includes(item.status)) {
+            actionsHtml = `<a href="/auto/progress/${item.id}/" class="btn-view"><i class="fas fa-spinner fa-spin me-1"></i> Progress</a>`;
+        } else if (item.status === 'invalidated') {
+            actionsHtml = `<a href="/auto/upload/" class="btn-view" style="background: #F47920;"><i class="fas fa-upload me-1"></i> Re-upload</a>`;
+        }
+        
+        const cleanRate = item.total_records > 0 
+            ? ((item.total_records - item.excluded_records) / item.total_records * 100).toFixed(1) + '% clean'
+            : '-';
         
         row.innerHTML = `
             <td>
-                <i class="fas fa-file-excel"></i>
-                ${upload.filename}
-            </td>
-            <td>${uploadDate.toLocaleDateString()} ${uploadDate.toLocaleTimeString()}</td>
-            <td>
-                <span class="status-badge ${statusClass}">
-                    ${getStatusIcon(upload.status)}
-                    ${upload.status.charAt(0).toUpperCase() + upload.status.slice(1)}
+                <span class="period-badge">
+                    <i class="fas fa-calendar-alt"></i>
+                    ${item.period_display}
                 </span>
             </td>
             <td>
-                ${upload.total_records ? `
+                <div>
+                    <strong>${item.uploaded_at}</strong>
+                    <br>
+                    <small class="text-muted"><i class="fas fa-user me-1"></i>${item.uploader}</small>
+                </div>
+            </td>
+            <td>
+                <div>
+                    <i class="fas fa-file-excel text-success me-1"></i>
+                    <span title="${item.filename}">${item.filename.length > 32 ? item.filename.slice(0, 29) + '...' : item.filename}</span>
+                    ${item.processing_time ? `<br><small class="text-muted"><i class="fas fa-stopwatch me-1"></i>${item.processing_time.toFixed(1)}s</small>` : ''}
+                </div>
+            </td>
+            <td>
+                ${item.total_records ? `
                     <div>
-                        <strong>${upload.total_records}</strong> total
+                        <strong>${item.total_records}</strong> total
                         <br>
-                        <small class="text-muted">
-                            ${upload.individual_records} individual, ${upload.corporate_records} corporate
-                            ${((upload.excluded_individual_records || 0) + (upload.excluded_corporate_records || 0)) > 0 ? 
-                                `<br><span style="color: #dc3545;">${(upload.excluded_individual_records || 0) + (upload.excluded_corporate_records || 0)} excluded records</span>` : ''}
-                            ${upload.unmatched_credit_records > 0 ? 
-                                `<br><span style="color: #dc3545;">${upload.unmatched_credit_records} unmatched credit</span>` : ''}
-                        </small>
+                        <small class="text-muted">${item.individual_records} Indiv &nbsp;·&nbsp; ${item.corporate_records} Corp</small>
                     </div>
                 ` : '<span class="text-muted">-</span>'}
             </td>
             <td>
-                ${upload.processing_time ? `${upload.processing_time.toFixed(1)}s` : '<span class="text-muted">-</span>'}
+                <div>
+                    <span class="clean-rate-text">${cleanRate}</span>
+                    ${exclTag}
+                    ${unmatchTag}
+                </div>
             </td>
             <td>
-                <button class="btn-delete" 
-                        data-upload-id="${upload.id}" 
-                        data-filename="${upload.filename}"
-                        title="Delete upload">
-                    <i class="fas fa-trash"></i>
-                </button>
+                <span class="status-badge ${statusClass}">
+                    ${getStatusIcon(item.status)}
+                    ${item.status_display}
+                </span>
+            </td>
+            <td style="text-align: right;">
+                <div style="display: inline-flex; gap: 6px; justify-content: flex-end;">
+                    ${actionsHtml}
+                </div>
             </td>
         `;
         
@@ -1416,7 +1621,12 @@ function getStatusIcon(status) {
     const icons = {
         'completed': '<i class="fas fa-check"></i>',
         'processing': '<i class="fas fa-spinner fa-spin"></i>',
+        'finalizing': '<i class="fas fa-spinner fa-spin"></i>',
         'pending': '<i class="fas fa-clock"></i>',
+        'uploading': '<i class="fas fa-clock"></i>',
+        'awaiting_verification': '<i class="fas fa-user-check"></i>',
+        'invalidated': '<i class="fas fa-lock-open"></i>',
+        'cancelled': '<i class="fas fa-ban"></i>',
         'failed': '<i class="fas fa-times"></i>'
     };
     return icons[status] || '<i class="fas fa-question"></i>';

@@ -41,240 +41,6 @@ class Subscriber(models.Model):
             return None
 
 
-
-
-class SubscriberToken(models.Model):
-    """
-    Model to manage secure tokens for subscriber access.
-    Replaces raw subscriber_id exposure with secure, random tokens.
-    Uses integer field for subscriber_id - NO foreign key to avoid constraint issues.
-    
-    Supports one-time binding where tokens can be marked as used after
-    permanently binding a user to a subscriber.
-    """
-    subscriber_id = models.IntegerField(
-        help_text="Reference to subscriber ID from external table",
-        db_index=True  # Add index for performance
-    )
-    token = models.CharField(max_length=32, unique=True, help_text="URL-safe random string")
-    is_active = models.BooleanField(default=True, db_index=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    expiry_date = models.DateTimeField(null=True, blank=True, help_text="Optional expiration date")
-    last_used_at = models.DateTimeField(null=True, blank=True)
-    usage_count = models.PositiveIntegerField(default=0)
-    created_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        related_name='created_tokens'
-    )
-    
-    # One-time binding fields
-    is_used_for_binding = models.BooleanField(
-        default=False,
-        db_index=True,
-        help_text="Whether this token has been used for permanent user-subscriber binding"
-    )
-    bound_user = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='binding_tokens',
-        help_text="User who used this token for permanent binding"
-    )
-    binding_date = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="When this token was used for binding"
-    )
-    binding_ip = models.GenericIPAddressField(
-        null=True,
-        blank=True,
-        help_text="IP address from which binding was performed"
-    )
-    
-    class Meta:
-        db_table = 'subscriber_tokens'
-        verbose_name = 'Subscriber Token'
-        verbose_name_plural = 'Subscriber Tokens'
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['subscriber_id', 'is_active']),
-            models.Index(fields=['token', 'is_active']),
-        ]
-    
-    def save(self, *args, **kwargs):
-        """Generate secure token if not provided"""
-        if not self.token:
-            self.token = secrets.token_urlsafe(16)
-        super().save(*args, **kwargs)
-    
-    def __str__(self):
-        try:
-            subscriber = self.get_subscriber()
-            subscriber_name = subscriber.subscriber_name if subscriber else f"ID:{self.subscriber_id}"
-            return f"Token for {subscriber_name} ({'Active' if self.is_active else 'Inactive'})"
-        except Exception:
-            return f"Token for Subscriber ID:{self.subscriber_id} ({'Active' if self.is_active else 'Inactive'})"
-    
-    def get_subscriber(self):
-        """
-        Get the related subscriber object manually (no FK relationship)
-        """
-        try:
-            return Subscriber.objects.get(subscriber_id=self.subscriber_id)
-        except Subscriber.DoesNotExist:
-            return None
-    
-    def is_valid(self):
-        """
-        Check if token is valid (active and not expired)
-        """
-        if not self.is_active:
-            return False
-        if self.expiry_date and timezone.now() > self.expiry_date:
-            return False
-        return True
-    
-    def mark_used(self):
-        """
-        Mark token as used (increment usage count and update last used time)
-        """
-        self.usage_count += 1
-        self.last_used_at = timezone.now()
-        self.save(update_fields=['usage_count', 'last_used_at'])
-    
-    @classmethod
-    def validate_token(cls, token_string, subscriber_id=None):
-        """
-        Validate a token string and optionally check subscriber association
-        Returns the token object if valid, None otherwise
-        """
-        try:
-            token_obj = cls.objects.get(token=token_string, is_active=True)
-            if not token_obj.is_valid():
-                return None
-            if subscriber_id and token_obj.subscriber_id != subscriber_id:
-                return None
-            return token_obj
-        except cls.DoesNotExist:
-            return None
-    
-    @classmethod
-    def get_tokens_for_subscriber(cls, subscriber_id):
-        """
-        Get all active tokens for a specific subscriber
-        """
-        return cls.objects.filter(subscriber_id=subscriber_id, is_active=True)
-    
-    def can_be_used_for_binding(self):
-        """
-        Check if this token can be used for one-time binding.
-        Returns True if token is valid and hasn't been used for binding yet.
-        """
-        return self.is_valid() and not self.is_used_for_binding
-    
-    def mark_used_for_binding(self, user, ip_address=None):
-        """
-        Mark this token as used for permanent user-subscriber binding.
-        
-        Args:
-            user: User who used this token for binding
-            ip_address: IP address from which binding was performed
-        
-        Returns:
-            bool: True if successfully marked as used
-        """
-        if self.is_used_for_binding:
-            return False  # Already used for binding
-        
-        if not self.is_valid():
-            return False  # Token is not valid
-        
-        # Mark as used for binding
-        self.is_used_for_binding = True
-        self.bound_user = user
-        self.binding_date = timezone.now()
-        self.binding_ip = ip_address
-        
-        # Also update regular usage tracking
-        self.usage_count += 1
-        self.last_used_at = timezone.now()
-        
-        self.save(update_fields=[
-            'is_used_for_binding', 'bound_user', 'binding_date', 'binding_ip',
-            'usage_count', 'last_used_at'
-        ])
-        
-        return True
-    
-    @classmethod
-    def validate_token_for_binding(cls, token_string, subscriber_id=None):
-        """
-        Validate a token specifically for one-time binding.
-        Returns the token object if valid for binding, None otherwise.
-        
-        Args:
-            token_string: The token to validate
-            subscriber_id: Optional subscriber ID to check against
-        
-        Returns:
-            SubscriberToken instance if valid for binding, None otherwise
-        """
-        try:
-            token_obj = cls.objects.get(token=token_string, is_active=True)
-            
-            # Check if token can be used for binding
-            if not token_obj.can_be_used_for_binding():
-                return None
-            
-            # Check subscriber association if provided
-            if subscriber_id and token_obj.subscriber_id != subscriber_id:
-                return None
-            
-            return token_obj
-        except cls.DoesNotExist:
-            return None
-    
-    @classmethod
-    def get_available_tokens_for_subscriber(cls, subscriber_id):
-        """
-        Get all tokens available for binding for a specific subscriber.
-        
-        Args:
-            subscriber_id: ID of the subscriber
-        
-        Returns:
-            QuerySet of available tokens
-        """
-        return cls.objects.filter(
-            subscriber_id=subscriber_id,
-            is_active=True,
-            is_used_for_binding=False
-        ).filter(
-            models.Q(expiry_date__isnull=True) | 
-            models.Q(expiry_date__gt=timezone.now())
-        )
-    
-    @classmethod
-    def get_binding_history_for_user(cls, user):
-        """
-        Get all tokens that were used by a specific user for binding.
-        
-        Args:
-            user: User instance
-        
-        Returns:
-            QuerySet of tokens used for binding by this user
-        """
-        return cls.objects.filter(
-            bound_user=user,
-            is_used_for_binding=True
-        ).order_by('-binding_date')
-
-
 class UserSubscriberPermission(models.Model):
     """
     Model to manage user-subscriber relationships with permission levels.
@@ -394,34 +160,6 @@ class SubscriberUtils:
             return None
     
     @staticmethod
-    def validate_user_subscriber_access(user, subscriber_id, token_string):
-        """
-        Comprehensive validation of user access to subscriber with token
-        Returns tuple: (is_valid, subscriber_obj, token_obj, permission_obj)
-        """
-        # Validate token
-        token_obj = SubscriberToken.validate_token(token_string, subscriber_id)
-        if not token_obj:
-            return False, None, None, None
-        
-        # Get subscriber
-        subscriber = SubscriberUtils.get_subscriber_by_id(subscriber_id)
-        if not subscriber:
-            return False, None, token_obj, None
-        
-        # Check user permissions
-        permission_obj = None
-        if user and user.is_authenticated:
-            try:
-                permission_obj = UserSubscriberPermission.objects.get(
-                    user=user, subscriber_id=subscriber_id, is_active=True
-                )
-            except UserSubscriberPermission.DoesNotExist:
-                pass
-        
-        return True, subscriber, token_obj, permission_obj
-    
-    @staticmethod
     def get_user_context_info(user):
         """
         Get comprehensive context information for a user
@@ -464,6 +202,7 @@ class UploadSession(models.Model):
         ('completed', 'Completed'),
         ('failed', 'Failed'),
         ('cancelled', 'Cancelled'),
+        ('invalidated', 'Invalidated (Re-upload Allowed)'),
     ]
     
     STAGE_CHOICES = [
@@ -551,6 +290,15 @@ class UploadSession(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     processing_started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    invalidated_at = models.DateTimeField(null=True, blank=True, help_text="When session was invalidated to allow re-upload")
+    invalidated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='invalidated_sessions',
+        help_text="Admin who invalidated session to allow re-upload"
+    )
     
     # Error tracking
     error_message = models.TextField(blank=True, null=True)
@@ -602,6 +350,23 @@ class UploadSession(models.Model):
         help_text="User-selected reporting year for output filename generation"
     )
     
+    # Split option for merged files ('split' or 'no_split')
+    split_option = models.CharField(
+        max_length=20,
+        default='split',
+        blank=True,
+        null=True,
+        help_text="User decision for merged files: 'split' or 'no_split'"
+    )
+    
+    # Password for encrypted files
+    file_password = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Password for encrypted Excel files"
+    )
+    
     class Meta:
         db_table = 'upload_sessions'
         verbose_name = 'Upload Session'
@@ -622,6 +387,11 @@ class UploadSession(models.Model):
             return Subscriber.objects.get(subscriber_id=self.subscriber_id)
         except Subscriber.DoesNotExist:
             return None
+
+    def get_subscriber_name(self):
+        """Get the related subscriber name"""
+        sub = self.get_subscriber()
+        return sub.subscriber_name if sub else f"ID: {self.subscriber_id}"
     
     def mark_processing_started(self):
         """Mark the upload as processing started"""
@@ -632,15 +402,24 @@ class UploadSession(models.Model):
         self.add_activity_log('Processing started')
         self.save(update_fields=['status', 'processing_stage', 'progress_percentage', 'processing_started_at'])
     
-    def update_progress(self, stage, percentage, message=''):
+    def update_progress(self, stage, percentage, message=None):
         """
-        Update processing progress with stage, percentage, and optional message
+        Update processing progress with user-friendly message.
+        Checks atomically if upload was cancelled and raises UploadCancelledException to halt execution.
         
         Args:
             stage: Processing stage from STAGE_CHOICES
             percentage: Progress percentage (0-100)
             message: Optional message describing current activity
         """
+        # Atomic cancellation check: if user or admin cancelled, halt processing immediately
+        if self.id:
+            from .tasks import is_session_cancelled
+            if is_session_cancelled(self.id):
+                self.status = 'cancelled'
+                from .exceptions import UploadCancelledException
+                raise UploadCancelledException(f"Upload session {self.id} was cancelled by user", session_id=self.id)
+
         self.processing_stage = stage
         self.progress_percentage = percentage
         if message:
@@ -687,6 +466,11 @@ class UploadSession(models.Model):
             commercial_count: Number of potential commercial entities in consumer records
             consumer_count: Number of potential consumer entities in commercial records
         """
+        if self.id:
+            from .tasks import is_session_cancelled
+            if is_session_cancelled(self.id):
+                return False
+
         self.status = 'awaiting_verification'
         self.processing_stage = 'awaiting_verification'
         self.progress_percentage = 80
@@ -700,9 +484,15 @@ class UploadSession(models.Model):
             'has_verification_candidates', 'commercial_candidates_count', 
             'consumer_candidates_count', 'current_message'
         ])
+        return True
     
     def mark_verification_completed(self):
         """Mark that human verification has been completed"""
+        if self.id:
+            from .tasks import is_session_cancelled
+            if is_session_cancelled(self.id):
+                return False
+
         self.verification_completed_at = timezone.now()
         self.status = 'finalizing'
         self.processing_stage = 'post_verification'
@@ -713,9 +503,15 @@ class UploadSession(models.Model):
             'verification_completed_at', 'status', 'processing_stage', 
             'progress_percentage', 'current_message'
         ])
+        return True
     
     def mark_verification_skipped(self):
         """Mark that verification was auto-skipped (no candidates found)"""
+        if self.id:
+            from .tasks import is_session_cancelled
+            if is_session_cancelled(self.id):
+                return False
+
         self.verification_skipped = True
         self.verification_completed_at = timezone.now()
         self.status = 'finalizing'
@@ -731,9 +527,15 @@ class UploadSession(models.Model):
             'processing_stage', 'progress_percentage', 'has_verification_candidates',
             'commercial_candidates_count', 'consumer_candidates_count', 'current_message'
         ])
+        return True
     
     def mark_completed(self, individual_count=0, corporate_count=0, processing_time=None):
-        """Mark the upload as completed with metrics"""
+        """Mark the upload as completed with metrics. Returns False if cancelled, True otherwise."""
+        if self.id:
+            from .tasks import is_session_cancelled
+            if is_session_cancelled(self.id):
+                return False
+
         self.status = 'completed'
         self.processing_stage = 'completed'
         self.progress_percentage = 100
@@ -757,9 +559,14 @@ class UploadSession(models.Model):
             'individual_records', 'corporate_records', 'total_records', 
             'processing_time', 'current_message'
         ])
+        return True
     
     def mark_failed(self, error_message=None):
         """Mark the upload as failed with user-friendly error message"""
+        if self.id:
+            from .tasks import is_session_cancelled
+            if is_session_cancelled(self.id):
+                return False
         self.status = 'failed'
         self.progress_percentage = 0
         self.completed_at = timezone.now()
@@ -778,6 +585,7 @@ class UploadSession(models.Model):
             
             self.add_activity_log(f'ERROR: {error_message[:200]}')
         self.save(update_fields=['status', 'progress_percentage', 'completed_at', 'error_message', 'current_message'])
+        return True
     
     def mark_cancelled(self, reason='Cancelled by user'):
         """Mark the upload as cancelled by user"""
@@ -832,6 +640,7 @@ class Feedback(models.Model):
         ('bug', 'Bug Report'),
         ('feature', 'Feature Request'),
         ('general', 'General Feedback'),
+        ('reupload_request', 'Request Re-upload / Correction'),
     ]
     
     user = models.ForeignKey(
@@ -842,8 +651,17 @@ class Feedback(models.Model):
         related_name='feedback_submissions',
         help_text="User who submitted the feedback (if authenticated)"
     )
+    contact_email = models.EmailField(
+        max_length=254,
+        blank=True,
+        null=True,
+        help_text="Contact email address for follow-up"
+    )
     rating = models.IntegerField(
-        help_text="User satisfaction rating (1-5 stars)"
+        default=0,
+        blank=True,
+        null=True,
+        help_text="User satisfaction rating (optional)"
     )
     category = models.CharField(
         max_length=20,
@@ -879,7 +697,8 @@ class Feedback(models.Model):
     
     def __str__(self):
         username = self.user.username if self.user else 'Anonymous'
-        return f"{self.get_category_display()} from {username} - {self.rating}★ ({self.created_at.strftime('%Y-%m-%d')})"
+        rating_str = f" - {self.rating}★" if self.rating else ""
+        return f"{self.get_category_display()} from {username}{rating_str} ({self.created_at.strftime('%Y-%m-%d')})"
     
     def mark_reviewed(self, notes=''):
         """Mark feedback as reviewed with optional notes"""

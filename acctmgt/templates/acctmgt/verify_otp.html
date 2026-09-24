@@ -1,0 +1,446 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>First Central - Verify Your Email</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #e8eef8 0%, #fef0e4 100%);
+            background-attachment: fixed;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .otp-container {
+            width: 100%;
+            max-width: 480px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 16px;
+            box-shadow: 0 15px 40px rgba(27, 61, 140, 0.12);
+            padding: 40px 35px;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            text-align: center;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .logo-img {
+            max-width: 170px;
+            height: auto;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background-color: #ecf0f1;
+            padding: 10px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+        }
+
+        .shield-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #1B3D8C, #143170);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin: 0 auto 18px;
+            box-shadow: 0 8px 20px rgba(27, 61, 140, 0.25);
+        }
+
+        .otp-title {
+            color: #12263a;
+            font-weight: 700;
+            font-size: 1.6rem;
+            margin-bottom: 8px;
+        }
+
+        .otp-subtitle {
+            color: #607289;
+            font-size: 0.95rem;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .email-badge {
+            display: inline-block;
+            background: #eef3fc;
+            color: #1B3D8C;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 25px;
+            border: 1px solid #d0e0fb;
+        }
+
+        /* 6 Digit Inputs */
+        .digit-inputs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        .digit-box {
+            width: 52px;
+            height: 60px;
+            font-size: 26px;
+            font-weight: 700;
+            text-align: center;
+            border: 2px solid #d9e2ec;
+            border-radius: 10px;
+            background: #f8fafc;
+            color: #1B3D8C;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        .digit-box:focus {
+            border-color: #1B3D8C;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(27, 61, 140, 0.15);
+            transform: scale(1.03);
+        }
+
+        .digit-box.filled {
+            border-color: #F47920;
+            background: #ffffff;
+        }
+
+        .btn-verify {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #1B3D8C, #143170);
+            color: #ffffff;
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 6px 18px rgba(27, 61, 140, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-verify:hover {
+            background: #D4620D;
+            box-shadow: 0 8px 22px rgba(212, 98, 13, 0.35);
+            transform: translateY(-1px);
+        }
+
+        .resend-section {
+            margin-top: 24px;
+            padding-top: 18px;
+            border-top: 1px solid #e9edf2;
+            font-size: 0.9rem;
+            color: #607289;
+        }
+
+        .btn-resend {
+            background: none;
+            border: none;
+            color: #1B3D8C;
+            font-weight: 600;
+            text-decoration: underline;
+            cursor: pointer;
+            padding: 0 4px;
+            transition: color 0.2s ease;
+        }
+
+        .btn-resend:disabled {
+            color: #94a3b8;
+            cursor: not-allowed;
+            text-decoration: none;
+        }
+
+        .btn-resend:hover:not(:disabled) {
+            color: #F47920;
+        }
+
+        .countdown-timer {
+            font-weight: 600;
+            color: #F47920;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 18px;
+            color: #64748b;
+            text-decoration: none;
+            font-size: 0.88rem;
+            transition: color 0.2s ease;
+        }
+
+        .back-link:hover {
+            color: #1B3D8C;
+        }
+
+        .alert-custom {
+            border-radius: 8px;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+            text-align: left;
+            transition: opacity 0.5s ease, transform 0.5s ease, max-height 0.5s ease, margin-bottom 0.5s ease, padding 0.5s ease;
+            overflow: hidden;
+            max-height: 120px;
+        }
+
+        .alert-custom.dismissed {
+            opacity: 0 !important;
+            transform: translateY(-8px) !important;
+            max-height: 0 !important;
+            margin-bottom: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            border: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="otp-container">
+        <!-- Logo -->
+        <img src="{% static 'auto/images/FirstCentralAPPROVEDLogo.png' %}" alt="First Central Logo" class="logo-img">
+
+        <!-- Shield Icon -->
+        <div class="shield-icon">
+            <i class="fas fa-user-shield"></i>
+        </div>
+
+        <h2 class="otp-title">Verify Your Account</h2>
+        <p class="otp-subtitle">
+            Enter the 6-digit verification code sent to your registered email address to activate your account.
+        </p>
+
+        {% if masked_email %}
+        <div class="email-badge">
+            <i class="fas fa-envelope me-2"></i>{{ masked_email }}
+        </div>
+        {% endif %}
+
+        <!-- Filtered Messages / Alerts -->
+        {% if filtered_messages %}
+            {% for message in filtered_messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} alert-custom alert-dismissible fade show" role="alert">
+                    <i class="fas {% if message.tags == 'error' or message.tags == 'danger' %}fa-exclamation-circle text-danger{% elif message.tags == 'success' %}fa-check-circle text-success{% else %}fa-info-circle text-primary{% endif %} me-2"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+
+        {% if error_message %}
+        <div class="alert alert-danger alert-custom">
+            <i class="fas fa-exclamation-triangle me-2"></i>{{ error_message }}
+        </div>
+        {% endif %}
+
+        <!-- OTP Form -->
+        <form method="post" action="{% url 'acctmgt:verify_otp' %}" id="otpForm">
+            {% csrf_token %}
+            <input type="hidden" name="user_id" value="{{ user_id }}">
+            <input type="hidden" name="otp_code" id="fullOtpCode">
+
+            <div class="digit-inputs">
+                <input type="text" class="digit-box" maxlength="1" pattern="[0-9]" inputmode="numeric" autofocus data-index="0">
+                <input type="text" class="digit-box" maxlength="1" pattern="[0-9]" inputmode="numeric" data-index="1">
+                <input type="text" class="digit-box" maxlength="1" pattern="[0-9]" inputmode="numeric" data-index="2">
+                <input type="text" class="digit-box" maxlength="1" pattern="[0-9]" inputmode="numeric" data-index="3">
+                <input type="text" class="digit-box" maxlength="1" pattern="[0-9]" inputmode="numeric" data-index="4">
+                <input type="text" class="digit-box" maxlength="1" pattern="[0-9]" inputmode="numeric" data-index="5">
+            </div>
+
+            <button type="submit" class="btn-verify" id="btnVerify">
+                <i class="fas fa-check-circle"></i>Verify & Continue
+            </button>
+        </form>
+
+        <!-- Resend Section -->
+        <div class="resend-section">
+            Didn't receive the code?
+            <form method="post" action="{% url 'acctmgt:resend_otp' %}" id="resendForm" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="user_id" value="{{ user_id }}">
+                <button type="submit" class="btn-resend" id="btnResend" disabled>Resend Code</button>
+            </form>
+            <div class="mt-1" id="timerContainer">
+                Resend available in <span class="countdown-timer" id="timer">60</span>s
+            </div>
+        </div>
+
+        <div>
+            <a href="{% url 'acctmgt:login' %}" class="back-link">
+                <i class="fas fa-arrow-left me-1"></i>Back to Sign In
+            </a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const digitInputs = document.querySelectorAll('.digit-box');
+            const fullOtpInput = document.getElementById('fullOtpCode');
+            const otpForm = document.getElementById('otpForm');
+            const btnVerify = document.getElementById('btnVerify');
+            const btnResend = document.getElementById('btnResend');
+            const timerSpan = document.getElementById('timer');
+            const timerContainer = document.getElementById('timerContainer');
+
+            // Focus first input automatically
+            if (digitInputs.length > 0) {
+                digitInputs[0].focus();
+            }
+
+            // Handle Input & Navigation between digit boxes
+            digitInputs.forEach((input, index) => {
+                input.addEventListener('input', function (e) {
+                    const value = this.value.replace(/[^0-9]/g, '');
+                    this.value = value ? value[0] : '';
+
+                    if (this.value) {
+                        this.classList.add('filled');
+                        if (index < digitInputs.length - 1) {
+                            digitInputs[index + 1].focus();
+                        }
+                    } else {
+                        this.classList.remove('filled');
+                    }
+                    syncFullOtp();
+
+                    // Option 1: Transfer focus to verify button upon completing 6 digits
+                    if (fullOtpInput.value.length === 6 && btnVerify) {
+                        btnVerify.focus();
+                    }
+                });
+
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Backspace' && !this.value && index > 0) {
+                        digitInputs[index - 1].focus();
+                        digitInputs[index - 1].value = '';
+                        digitInputs[index - 1].classList.remove('filled');
+                        syncFullOtp();
+                    }
+                });
+
+                // Support pasting full 6-digit code
+                input.addEventListener('paste', function (e) {
+                    e.preventDefault();
+                    const pasteData = (e.clipboardData || window.clipboardData).getData('text').trim();
+                    const digits = pasteData.replace(/[^0-9]/g, '').slice(0, 6);
+                    
+                    digits.split('').forEach((char, i) => {
+                        if (digitInputs[i]) {
+                            digitInputs[i].value = char;
+                            digitInputs[i].classList.add('filled');
+                        }
+                    });
+
+                    syncFullOtp();
+
+                    // Option 1: Transfer focus to verify button upon pasting full 6 digits
+                    if (digits.length === 6) {
+                        if (btnVerify) {
+                            btnVerify.focus();
+                        }
+                    } else if (digits.length > 0) {
+                        const nextIndex = Math.min(digits.length, digitInputs.length - 1);
+                        digitInputs[nextIndex].focus();
+                    }
+                });
+            });
+
+            // Allow pressing Backspace on the verify button to return to editing the last digit
+            if (btnVerify) {
+                btnVerify.addEventListener('keydown', function (e) {
+                    if (e.key === 'Backspace' && digitInputs.length > 0) {
+                        e.preventDefault();
+                        const lastBox = digitInputs[digitInputs.length - 1];
+                        lastBox.focus();
+                        lastBox.value = '';
+                        lastBox.classList.remove('filled');
+                        syncFullOtp();
+                    }
+                });
+            }
+
+            function syncFullOtp() {
+                let code = '';
+                digitInputs.forEach(input => {
+                    code += input.value;
+                });
+                fullOtpInput.value = code;
+            }
+
+            otpForm.addEventListener('submit', function (e) {
+                syncFullOtp();
+                if (fullOtpInput.value.length !== 6) {
+                    e.preventDefault();
+                    alert('Please enter all 6 digits of the verification code.');
+                    const firstEmpty = Array.from(digitInputs).find(input => !input.value);
+                    if (firstEmpty) firstEmpty.focus();
+                }
+            });
+
+            // Resend Countdown Timer
+            let timeLeft = {{ cooldown_remaining|default:60 }};
+            if (timeLeft <= 0) {
+                btnResend.disabled = false;
+                timerContainer.style.display = 'none';
+            } else {
+                const interval = setInterval(function () {
+                    timeLeft--;
+                    timerSpan.textContent = timeLeft;
+                    if (timeLeft <= 0) {
+                        clearInterval(interval);
+                        btnResend.disabled = false;
+                        timerContainer.style.display = 'none';
+                    }
+                }, 1000);
+            }
+
+            // Auto-dismiss alert notifications after 2 seconds seamlessly
+            const alerts = document.querySelectorAll('.alert-custom');
+            if (alerts.length > 0) {
+                setTimeout(() => {
+                    alerts.forEach(alert => {
+                        alert.classList.add('dismissed');
+                        setTimeout(() => {
+                            if (alert.parentNode) {
+                                alert.remove();
+                            }
+                        }, 500);
+                    });
+                }, 2000);
+            }
+        });
+    </script>
+</body>
+
+</html>
+
+

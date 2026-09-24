@@ -1,0 +1,511 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Subscriber Completion Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-dashboard-container {
+        padding: 1.5rem 0 3rem;
+    }
+
+    .page-header {
+        margin-bottom: 2rem;
+    }
+
+    .page-title {
+        color: #1B3D8C;
+        font-weight: 700;
+        font-size: 1.75rem;
+        margin-bottom: 0.35rem;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .page-subtitle {
+        color: #64748b;
+        font-size: 0.95rem;
+        margin: 0;
+    }
+
+    /* KPI Summary Cards */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 2rem;
+    }
+
+    .kpi-card {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    .kpi-icon-wrapper {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .kpi-icon-period {
+        background-color: #eff6ff;
+        color: #1B3D8C;
+    }
+
+    .kpi-icon-completed {
+        background-color: #ecfdf5;
+        color: #10b981;
+    }
+
+    .kpi-icon-records {
+        background-color: #fff7ed;
+        color: #f97316;
+    }
+
+    .kpi-icon-recent {
+        background-color: #f5f3ff;
+        color: #8b5cf6;
+    }
+
+    .kpi-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #64748b;
+        margin-bottom: 0.25rem;
+    }
+
+    .kpi-value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+        line-height: 1.2;
+    }
+
+    /* Controls Bar */
+    .controls-card {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        margin-bottom: 1.5rem;
+        border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+
+    .controls-wrapper {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .period-filter-form {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .period-filter-form label {
+        font-weight: 600;
+        color: #334155;
+        font-size: 0.9rem;
+        margin: 0;
+    }
+
+    .form-select-period {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background-color: #f8fafc;
+        color: #1e293b;
+        font-weight: 600;
+        cursor: pointer;
+        min-width: 200px;
+    }
+
+    .form-select-period:focus {
+        outline: none;
+        border-color: #1B3D8C;
+        box-shadow: 0 0 0 3px rgba(27, 61, 140, 0.15);
+    }
+
+    .search-input-wrapper {
+        position: relative;
+        min-width: 260px;
+        flex: 1;
+        max-width: 380px;
+    }
+
+    .search-input-wrapper i {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        font-size: 0.85rem;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 0.5rem 1rem 0.5rem 2.25rem;
+        font-size: 0.9rem;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background-color: #f8fafc;
+        color: #1e293b;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: #1B3D8C;
+        background-color: #ffffff;
+        box-shadow: 0 0 0 3px rgba(27, 61, 140, 0.15);
+    }
+
+    /* Tracker Table */
+    .table-card {
+        background: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        overflow: hidden;
+    }
+
+    .table-responsive {
+        margin: 0;
+    }
+
+    .tracker-table {
+        width: 100%;
+        margin-bottom: 0;
+        border-collapse: collapse;
+    }
+
+    .tracker-table thead {
+        background-color: #f8fafc;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .tracker-table th {
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: #475569;
+        padding: 1rem 1.25rem;
+        text-align: left;
+    }
+
+    .tracker-table td {
+        padding: 1.1rem 1.25rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 0.92rem;
+        color: #1e293b;
+    }
+
+    .tracker-table tbody tr:hover {
+        background-color: #f8fafc;
+    }
+
+    .subscriber-title {
+        font-weight: 700;
+        color: #0f172a;
+        font-size: 0.95rem;
+        margin-bottom: 2px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .sub-id-badge {
+        font-size: 0.72rem;
+        background-color: #f1f5f9;
+        color: #475569;
+        padding: 2px 7px;
+        border-radius: 5px;
+        font-family: monospace;
+        font-weight: 600;
+        border: 1px solid #e2e8f0;
+    }
+
+    .period-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background-color: #eff6ff;
+        color: #1B3D8C;
+        border: 1px solid #bfdbfe;
+        font-weight: 600;
+        font-size: 0.82rem;
+        padding: 4px 10px;
+        border-radius: 6px;
+    }
+
+    .date-text {
+        font-size: 0.9rem;
+        color: #334155;
+        font-weight: 500;
+    }
+
+    .records-count {
+        font-weight: 700;
+        color: #0f172a;
+        font-size: 0.95rem;
+    }
+
+    .records-subtext {
+        font-size: 0.76rem;
+        color: #64748b;
+        margin-top: 2px;
+    }
+
+    .uploader-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.84rem;
+        color: #475569;
+    }
+
+    .status-completed-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background-color: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+        font-size: 0.76rem;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    /* Empty state */
+    .empty-state {
+        padding: 4rem 2rem;
+        text-align: center;
+        color: #64748b;
+    }
+
+    .empty-state-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background-color: #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.25rem;
+        font-size: 1.5rem;
+        color: #94a3b8;
+    }
+
+    .empty-state h5 {
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 0.4rem;
+    }
+
+    .empty-state p {
+        margin: 0;
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-dashboard-container">
+    <!-- Header -->
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-tasks text-primary"></i>
+            Bureau Subscriber Completion Tracker
+        </h1>
+        <p class="page-subtitle">
+            Live operations record of financial institutions that have completed monthly data submissions.
+        </p>
+    </div>
+
+    <!-- Summary KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-icon-wrapper kpi-icon-period">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div>
+                <div class="kpi-label">Active Period</div>
+                <div class="kpi-value">{{ selected_period_label|default:"All Periods" }}</div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon-wrapper kpi-icon-completed">
+                <i class="fas fa-check-double"></i>
+            </div>
+            <div>
+                <div class="kpi-label">Subscribers Completed</div>
+                <div class="kpi-value">{{ total_completed_count|default:"0" }}</div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon-wrapper kpi-icon-records">
+                <i class="fas fa-database"></i>
+            </div>
+            <div>
+                <div class="kpi-label">Total Records</div>
+                <div class="kpi-value">{{ total_records_sum|default:"0" }}</div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon-wrapper kpi-icon-recent">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div>
+                <div class="kpi-label">Latest Completion</div>
+                <div class="kpi-value" style="font-size: 1.05rem;">
+                    {% if latest_completion %}{{ latest_completion|date:"M d, H:i" }}{% else %}None yet{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls / Filters Bar -->
+    <div class="controls-card">
+        <div class="controls-wrapper">
+            <form method="get" action="{% url 'auto:dashboard' %}" class="period-filter-form" id="periodFilterForm">
+                <label for="periodSelect"><i class="fas fa-filter me-1 text-primary"></i>Reporting Month:</label>
+                <select name="period" id="periodSelect" class="form-select-period" onchange="document.getElementById('periodFilterForm').submit()">
+                    <option value="all" {% if selected_period == 'all' %}selected{% endif %}>All Reporting Periods</option>
+                    {% for p in available_periods %}
+                    <option value="{{ p.value }}" {% if selected_period == p.value %}selected{% endif %}>
+                        {{ p.label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+
+            <div class="search-input-wrapper">
+                <i class="fas fa-search"></i>
+                <input type="text" id="subscriberSearchInput" class="search-input" placeholder="Search by institution name or uploader..." onkeyup="filterSubscribersTable()">
+            </div>
+        </div>
+    </div>
+
+    <!-- Completed Submissions Table -->
+    <div class="table-card">
+        {% if completed_list %}
+        <div class="table-responsive">
+            <table class="tracker-table" id="trackerTable">
+                <thead>
+                    <tr>
+                        <th style="width: 32%;">Subscriber / Organization</th>
+                        <th style="width: 18%;">Reporting Period</th>
+                        <th style="width: 20%;">Date Completed</th>
+                        <th style="width: 15%;">Total Records</th>
+                        <th style="width: 15%;">Uploaded By</th>
+                    </tr>
+                </thead>
+                <tbody id="trackerTableBody">
+                    {% for item in completed_list %}
+                    <tr class="tracker-row" data-search="{{ item.subscriber_name|lower }} {{ item.subscriber_id }} {{ item.uploader|lower }}">
+                        <td>
+                            <div class="subscriber-title">
+                                <span>{{ item.subscriber_name }}</span>
+                                <span class="sub-id-badge">ID: {{ item.subscriber_id }}</span>
+                            </div>
+                            <span class="status-completed-pill">
+                                <i class="fas fa-check"></i> Completed
+                            </span>
+                        </td>
+                        <td>
+                            <span class="period-badge">
+                                <i class="fas fa-calendar-alt"></i>
+                                {{ item.period_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="date-text">
+                                <i class="fas fa-check-circle text-success me-1"></i>
+                                {{ item.completed_at|date:"M d, Y, H:i" }}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="records-count">{{ item.total_records|default:"0" }}</div>
+                            {% if item.individual_records or item.corporate_records %}
+                            <div class="records-subtext">
+                                {{ item.individual_records|default:"0" }} Indiv &bull; {{ item.corporate_records|default:"0" }} Corp
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="uploader-badge">
+                                <i class="fas fa-user-circle text-muted"></i>
+                                {{ item.uploader }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="fas fa-folder-open"></i>
+            </div>
+            <h5>No Completed Uploads Found</h5>
+            <p>
+                {% if selected_period != 'all' %}
+                No financial institutions have completed submissions for <strong>{{ selected_period_label }}</strong> yet.
+                {% else %}
+                There are currently no completed uploads in the system.
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    function filterSubscribersTable() {
+        const query = document.getElementById('subscriberSearchInput').value.toLowerCase().trim();
+        const rows = document.querySelectorAll('.tracker-row');
+        
+        rows.forEach(row => {
+            const searchData = row.getAttribute('data-search') || '';
+            if (searchData.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+</script>
+{% endblock %}

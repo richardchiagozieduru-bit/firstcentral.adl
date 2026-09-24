@@ -15,6 +15,14 @@
         display: none !important;
     }
 
+    /* Override Bootstrap container styles to take 100% width and align scrollbar to the side */
+    main.container {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
     /* --- NEW: Light blue linear gradient background --- */
     html,
     body {
@@ -458,20 +466,50 @@
         if (!confirm('Discard this upload and return to the Dashboard?\n\nThe processing session will be cancelled.')) return;
         var btn = $(this);
         var uploadId = btn.data('upload-id');
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Cancelling...');
-        var csrfToken = $('input[name="csrfmiddlewaretoken"]').val();
-        if (uploadId) {
-            $.ajax({
-                url: '/api/cancel-upload/' + uploadId + '/',
-                method: 'POST',
-                data: { csrfmiddlewaretoken: csrfToken },
-                complete: function () {
-                    window.location.href = '{% url "auto:dashboard" %}';
-                }
-            });
-        } else {
+
+        if (!uploadId) {
+            alert('Upload session ID not found. Returning to dashboard.');
             window.location.href = '{% url "auto:dashboard" %}';
+            return;
         }
+
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Cancelling...');
+
+        // Retrieve CSRF token from form or cookie
+        var csrfToken = $('input[name="csrfmiddlewaretoken"]').val();
+        if (!csrfToken) {
+            var match = document.cookie.match(/(^|;)\s*csrftoken\s*=\s*([^;]+)/);
+            csrfToken = match ? match[2] : '';
+        }
+
+        var cancelUrl = '{% url "auto:cancel_upload" 0 %}'.replace('0', uploadId);
+
+        fetch(cancelUrl, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin'
+        })
+        .then(function (res) {
+            return res.json().then(function (data) {
+                return { status: res.status, ok: res.ok, data: data };
+            });
+        })
+        .then(function (result) {
+            if (result.ok && result.data.success) {
+                window.location.href = '{% url "auto:dashboard" %}';
+            } else {
+                var errorMsg = (result.data && result.data.error) ? result.data.error : 'Failed to cancel upload session.';
+                alert(errorMsg);
+                btn.prop('disabled', false).html('<i class="fas fa-times me-1"></i> Discard &amp; Go to Dashboard');
+            }
+        })
+        .catch(function (err) {
+            alert('A network error occurred while cancelling the upload.');
+            btn.prop('disabled', false).html('<i class="fas fa-times me-1"></i> Discard &amp; Go to Dashboard');
+        });
     });
 </script>
 

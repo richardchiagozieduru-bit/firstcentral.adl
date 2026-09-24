@@ -1,0 +1,16 @@
+Hello {{ username }},
+
+A sign-in attempt was initiated for your account. To complete sign-in, please enter the following 6-digit security code:
+
+========================================
+SIGN-IN CODE: {{ otp_code }}
+(Valid for {{ expiry_minutes }} minutes)
+========================================
+
+SECURITY ALERT:
+If you did not attempt to sign in, someone may have entered your password. Please immediately notify your administrator at {{ support_email }} or reset your password.
+
+---
+First Central Credit Bureau
+Automated Data Processing Suite
+Support: {{ support_email }}

@@ -139,3 +139,14 @@ class VerificationError(CreditBureauException):
     def __init__(self, message, session_id=None):
         self.session_id = session_id
         super().__init__(message)
+
+
+class UploadCancelledException(CreditBureauException):
+    """
+    Raised when an upload session is cancelled by user or administrator.
+    Halts background processing immediately and suppresses any further
+    pipeline execution, completion status changes, or notification emails.
+    """
+    def __init__(self, message="Upload was cancelled by user", session_id=None):
+        self.session_id = session_id
+        super().__init__(message)

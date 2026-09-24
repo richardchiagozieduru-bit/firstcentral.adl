@@ -19,7 +19,7 @@ from datetime import datetime as dt
 from .models import UploadSession
 from .exceptions import (
     DataValidationError, FileProcessingError, MergeError,
-    OutputGenerationError, VerificationError
+    OutputGenerationError, VerificationError, UploadCancelledException
 )
 from .map import (
     consu_mapping, comm_mapping, credit_mapping, guar_mapping, prin_mapping,
@@ -28,9 +28,10 @@ from .map import (
 from .views import (
     # Import all the processing functions
     ensure_all_sheets_exist, validate_required_sheets_present, clean_sheet_name, convert_numpy,
+    resolve_sheet_name, RECOGNIZED_CANONICAL_SHEETS, IGNORED_SHEET_KEYWORDS,
     remove_special_characters, make_column_names_unique,
     preprocess_tenor_from_headers, preprocess_arrears_from_headers, rename_columns_with_fuzzy_rapidfuzz,
-    process_dates, process_names, replace_ampersands, process_special_characters,
+    process_dates, process_names,process_special_characters,
     process_nationality, process_gender, process_states, process_marital_status,
     process_borrower_type, process_employment_status, process_phone_columns,
     process_title, process_account_status, process_loan_type, process_currency,
@@ -51,12 +52,122 @@ from .identifier_utils import (
     patch_chunk_identifier_columns,
 )
 from .views import build_excel_report
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMessage, EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.urls import reverse
 from django.conf import settings as django_settings
+
 
 # Constants for chunked processing
 LARGE_SHEET_THRESHOLD = 50000  # Process sheets with >50k rows in chunks
 CHUNK_SIZE = 50000  # Rows per chunk for large sheets
+
+
+def send_admin_completion_alert(upload_session, subscriber_name, reporting_period, total_records):
+    """
+    Sends a streamlined completion alert to bureau administrators.
+    Alert strictly contains: Institution Name, Reporting Period, Total Records, and Who Uploaded.
+    """
+    try:
+        from django.contrib.auth.models import User
+
+        # 1. Determine recipients from settings, decouple, or active staff/superusers
+        recipients = list(getattr(django_settings, 'BUREAU_NOTIFICATION_EMAILS', []))
+        if not recipients:
+            try:
+                from decouple import config
+                recipients = [
+                    e.strip() for e in config('BUREAU_NOTIFICATION_EMAILS', default='').split(',') if e.strip()
+                ]
+            except Exception:
+                pass
+
+        if not recipients:
+            staff_emails = list(
+                User.objects.filter(is_staff=True, is_active=True)
+                .exclude(email='')
+                .values_list('email', flat=True)
+            )
+            recipients = [e for e in staff_emails if e]
+
+        if not recipients:
+            logger.info("[ADMIN ALERT] No bureau notification recipients configured or found.")
+            return
+
+        uploader_name = upload_session.user.get_full_name() or upload_session.user.username if upload_session.user else "System"
+
+        subject = f"[Submission Alert] {subscriber_name} - {reporting_period}" if reporting_period else f"[Submission Alert] {subscriber_name}"
+
+        context = {
+            'subscriber_name': subscriber_name,
+            'subscriber_id': upload_session.subscriber_id,
+            'reporting_period': reporting_period or "Current Period",
+            'total_records': f"{total_records:,}",
+            'uploaded_by': uploader_name,
+        }
+
+        html_content = render_to_string('emails/admin_submission_alert.html', context)
+        try:
+            text_content = render_to_string('emails/admin_submission_alert.txt', context)
+        except Exception:
+            text_content = strip_tags(html_content)
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=django_settings.DEFAULT_FROM_EMAIL,
+            to=recipients,
+        )
+        email.attach_alternative(html_content, "text/html")
+        email.send(fail_silently=False)
+        logger.info(f"[ADMIN ALERT] Submission alert sent to {recipients} for {subscriber_name}")
+    except Exception as e:
+        logger.error(f"[ADMIN ALERT ERROR] Failed to send admin submission alert: {e}", exc_info=True)
+
+
+def read_excel_file(uploaded_file, filename: str, password: str | None = None):
+    """Read uploaded Excel file, with optional password decryption."""
+    import io
+    import zipfile
+    try:
+        import msoffcrypto
+    except ImportError:
+        msoffcrypto = None
+        logger.warning("[PASSWORD DECRYPTION] msoffcrypto library not installed")
+
+    # If uploaded_file is a file path string, read into in-memory buffer to prevent Windows file locking
+    if isinstance(uploaded_file, str):
+        with open(uploaded_file, "rb") as f:
+            source_file = io.BytesIO(f.read())
+    else:
+        source_file = uploaded_file
+        source_file.seek(0)
+
+ 
+    source_stream = source_file
+    if password and msoffcrypto:
+        try:
+            decrypted = io.BytesIO()
+            office_file = msoffcrypto.OfficeFile(source_file)
+            office_file.load_key(password=password)
+            office_file.decrypt(decrypted)
+            decrypted.seek(0)
+            source_stream = decrypted
+        except Exception as e:
+            logger.error(f"[PASSWORD DECRYPTION] Failed to decrypt Excel file: {e}")
+            if isinstance(uploaded_file, str):
+                source_file.close()
+            raise ValueError("Invalid password or failed to decrypt password-protected file.") from e
+ 
+    try:
+        if filename.lower().endswith(".xls"):
+            return pd.ExcelFile(source_stream, engine="xlrd")
+        return pd.ExcelFile(source_stream, engine="openpyxl")
+    except zipfile.BadZipFile as e:
+        if isinstance(uploaded_file, str):
+            source_file.close()
+        raise ValueError("The Excel file is invalid/corrupt (not a valid zip-based workbook). If password-protected, please enter the file password.") from e
 
 
 # ============================================================================
@@ -419,7 +530,7 @@ def load_from_parquet(session_id, sheet_name, columns=None):
     return df
 
 
-def cleanup_temp_files(session_id, keep_unmatched_credits=True):
+def cleanup_temp_files(session_id, keep_unmatched_credits=True, preserve_cancellation_marker=False):
     """
     Delete temporary Parquet files for a session, optionally keeping 
     unmatched_credits and excluded records for Excel report generation
@@ -428,6 +539,8 @@ def cleanup_temp_files(session_id, keep_unmatched_credits=True):
         session_id: UploadSession ID
         keep_unmatched_credits: If True, preserve unmatched_credits.parquet 
                                 and excluded_*.parquet for Excel report generation
+        preserve_cancellation_marker: If True, do not delete cancelled_<id> sentinel marker
+                                      so running workers can still detect cancellation.
     """
 
     
@@ -472,6 +585,44 @@ def cleanup_temp_files(session_id, keep_unmatched_credits=True):
             logger.info(f"[[PARQUET] Cleanup complete")
     else:
         logger.info(f"[[PARQUET] No temp directory to cleanup for session {session_id}")
+
+    if not keep_unmatched_credits and not preserve_cancellation_marker:
+        marker_path = os.path.join(settings.MEDIA_ROOT, 'temp', f'cancelled_{session_id}')
+        if os.path.exists(marker_path):
+            try:
+                os.remove(marker_path)
+            except Exception:
+                pass
+
+
+def is_session_cancelled(session_id):
+    """
+    Atomically check if an upload session was cancelled by user.
+    Checks both filesystem sentinel marker and database status.
+    """
+    if not session_id:
+        return False
+    try:
+        marker_path = os.path.join(settings.MEDIA_ROOT, 'temp', f'cancelled_{session_id}')
+        if os.path.exists(marker_path):
+            return True
+    except Exception:
+        pass
+
+    try:
+        from .models import UploadSession
+        current_status = UploadSession.objects.filter(id=session_id).values_list('status', flat=True).first()
+        return current_status == 'cancelled'
+    except Exception:
+        return False
+
+
+def check_cancellation(session_id):
+    """
+    Raise UploadCancelledException immediately if upload was cancelled by user.
+    """
+    if is_session_cancelled(session_id):
+        raise UploadCancelledException(f"Upload session {session_id} was cancelled by user", session_id=session_id)
 
 
 # ============================================================================
@@ -544,6 +695,24 @@ def preprocess_sheet_columns(sheet_data, cleaned_name):
         cleaned_df = rename_columns_with_fuzzy_rapidfuzz(cleaned_df, commercial_merged_mapping)
     
     return cleaned_df
+def replace_double_spaces(df):
+    """
+    Replace multiple/double spaces with a single space in all string values
+    """
+    if df is None or df.empty:
+        return df
+    
+    import re
+    def clean_spaces(val):
+        if isinstance(val, str):
+            return re.sub(r'\s+', ' ', val).strip()
+        return val
+
+    # Use apply on each column to ensure compatibility across all pandas versions
+    for col in df.columns:
+        df[col] = df[col].apply(clean_spaces)
+        
+    return df
 
 def process_single_sheet(sheet_data, cleaned_name, cutoff_date=None, skip_preprocessing=False):
     """
@@ -568,8 +737,7 @@ def process_single_sheet(sheet_data, cleaned_name, cutoff_date=None, skip_prepro
     # Step 2: Apply all data cleaning transformations
     cleaned_df = process_dates(cleaned_df, cutoff_date=cutoff_date)
     cleaned_df = process_names(cleaned_df)
-    cleaned_df = clean_business_name(cleaned_df)  # Clean repetitive numbers like 0, 000, 11111
-    cleaned_df = replace_ampersands(cleaned_df)
+    cleaned_df = clean_business_name(cleaned_df)
     cleaned_df = process_special_characters(cleaned_df)
     cleaned_df = process_nationality(cleaned_df)
     cleaned_df = process_gender(cleaned_df)
@@ -598,9 +766,10 @@ def process_single_sheet(sheet_data, cleaned_name, cutoff_date=None, skip_prepro
     cleaned_df = process_otherid(cleaned_df)
     cleaned_df = process_tax_numbers(cleaned_df)
     cleaned_df = process_collateral_details(cleaned_df)
-    cleaned_df = positioninBusiness(cleaned_df)
-    cleaned_df = trim_strings_to_59(cleaned_df)
+    cleaned_df = positioninBusiness(cleaned_df)    
     cleaned_df = remove_duplicates(cleaned_df)
+    cleaned_df = trim_strings_to_59(cleaned_df)
+    cleaned_df = replace_double_spaces(cleaned_df)
     
     return cleaned_df
 
@@ -725,23 +894,37 @@ def process_large_sheet_chunked(file_path, sheet_name, cleaned_name, chunk_size=
     return final_result
 
 
-def get_sheet_row_count(file_path, sheet_name):
+def get_sheet_row_count(file_path, sheet_name, password=None):
     """
     Quickly get the row count of a sheet without loading all data.
+    Supports .xlsx (openpyxl), .xls (xlrd), .xlsb (pyxlsb), and password-protected files.
     
     Args:
         file_path: Path to Excel file
         sheet_name: Name of sheet
+        password: Optional password for encrypted files
     
     Returns:
         Number of rows in sheet (excluding header)
     """
     try:
-        workbook = openpyxl.load_workbook(file_path, read_only=True)
-        sheet = workbook[sheet_name]
-        row_count = sheet.max_row - 1  # Subtract 1 for header row
-        workbook.close()
-        return row_count
+        ext = file_path.lower()
+        if ext.endswith('.xls') or password:
+            excel_file = read_excel_file(file_path, filename=os.path.basename(file_path), password=password)
+            parsed_df = excel_file.parse(sheet_name)
+            return len(parsed_df)
+        elif ext.endswith('.xlsb'):
+            import pyxlsb
+            with pyxlsb.open_workbook(file_path) as wb:
+                with wb.get_sheet(sheet_name) as sheet:
+                    row_count = sum(1 for _ in sheet.rows()) - 1
+                    return max(0, row_count)
+        else:
+            workbook = openpyxl.load_workbook(file_path, read_only=True)
+            sheet = workbook[sheet_name]
+            row_count = sheet.max_row - 1  # Subtract 1 for header row
+            workbook.close()
+            return max(0, row_count)
     except Exception as e:
         logger.warning(f"[[ROW COUNT] Error getting row count for '{sheet_name}': {e}")
         return 0
@@ -787,6 +970,14 @@ def resolve_csv_sheet_type(filename_stem):
         str: Canonical sheet type name (e.g. "creditinformation") or the
              cleaned stem if no match is found.
     """
+    # 1. Use centralized resolve_sheet_name first (which rejects catalogue/auxiliary sheets)
+    resolved = resolve_sheet_name(filename_stem)
+    if resolved:
+        return resolved
+
+    if any(keyword in filename_stem.lower() for keyword in IGNORED_SHEET_KEYWORDS):
+        return None
+
     # Clean exactly as clean_sheet_name does
     cleaned = re.sub(r'[^a-zA-Z0-9]', '', filename_stem).lower()
 
@@ -902,7 +1093,8 @@ def process_large_csv_chunked(file_path, cleaned_name, chunk_size=None, cutoff_d
 
 def process_uploaded_file(upload_session_id, file_paths, original_filenames, 
                           subscriber_id, subscriber_name, user_id,
-                          reporting_month=None, reporting_year=None):
+                          reporting_month=None, reporting_year=None,
+                          split_option='split', file_password=None):
     """
     Asynchronous task to process uploaded Excel file(s)
     
@@ -915,6 +1107,8 @@ def process_uploaded_file(upload_session_id, file_paths, original_filenames,
         user_id: User ID who uploaded the file
         reporting_month: User-selected reporting month (1-12) or None
         reporting_year: User-selected reporting year or None
+        split_option: User split preference ('split' or 'no_split')
+        file_password: Password for encrypted Excel files
     """
     # Normalize inputs to lists for consistent handling (backward compatible)
     if isinstance(file_paths, str):
@@ -926,16 +1120,24 @@ def process_uploaded_file(upload_session_id, file_paths, original_filenames,
     logger.info(f"[ASYNC TASK] Starting file processing for UploadSession {upload_session_id}")
     logger.info(f"[ASYNC TASK] Processing {file_count} file(s): {original_filenames}")
     logger.info(f"[ASYNC TASK] User-selected reporting period: {reporting_month}/{reporting_year}")
+    logger.info(f"[ASYNC TASK] Split option: {split_option}, Password provided: {bool(file_password)}")
     
     try:
         # Get upload session
+        check_cancellation(upload_session_id)
         upload_session = UploadSession.objects.get(id=upload_session_id)
+        if upload_session.status == 'cancelled' or is_session_cancelled(upload_session_id):
+            logger.info(f"[ASYNC TASK] UploadSession {upload_session_id} is cancelled. Aborting task before execution.")
+            cleanup_temp_files(upload_session_id, keep_unmatched_credits=False)
+            return
+        split_option = split_option or getattr(upload_session, 'split_option', 'split') or 'split'
+        file_password = file_password or getattr(upload_session, 'file_password', None)
         
         # Archive original file early in async processing (non-blocking)
         print(f"[ASYNC TASK] Archiving original file...")
         from .file_archival_utils import save_original_file
         try:
-            with open(file_path, 'rb') as f:
+            with open(file_paths[0], 'rb') as f:
                 from django.core.files.base import File
                 original_save_success, original_file_path, original_error = save_original_file(
                     File(f),
@@ -970,7 +1172,10 @@ def process_uploaded_file(upload_session_id, file_paths, original_filenames,
                 # For CSV files the sheet type is inferred from the original filename
                 original_filename = original_filenames[file_idx]
                 filename_stem = os.path.splitext(original_filename)[0]
-                cleaned_name = resolve_csv_sheet_type(filename_stem)
+                cleaned_name = resolve_sheet_name(filename_stem) or resolve_csv_sheet_type(filename_stem)
+                if not cleaned_name or cleaned_name not in RECOGNIZED_CANONICAL_SHEETS:
+                    logger.info(f"[ASYNC TASK] ℹ Skipping unrecognized / auxiliary CSV: '{original_filename}'")
+                    continue
                 sheet_name = filename_stem  # use filename stem as the pseudo sheet name
                 row_count = get_sheet_row_count_csv(file_path)
                 all_sheet_info[file_path][sheet_name] = {
@@ -985,19 +1190,35 @@ def process_uploaded_file(upload_session_id, file_paths, original_filenames,
                     f"({'large' if row_count > LARGE_SHEET_THRESHOLD else 'normal'}, {row_count:,} rows)"
                 )
             else:
-                # Determine engine based on file extension (.xlsb requires pyxlsb)
-                engine = 'pyxlsb' if file_path.lower().endswith('.xlsb') else None
-                with pd.ExcelFile(file_path, engine=engine) as excel_file:
-                    sheet_names = excel_file.sheet_names
+                filename = original_filenames[file_idx] if file_idx < len(original_filenames) else os.path.basename(file_path)
+                try:
+                    if file_path.lower().endswith('.xlsb'):
+                        engine = 'pyxlsb'
+                        with pd.ExcelFile(file_path, engine=engine) as excel_file:
+                            sheet_names = excel_file.sheet_names
+                    else:
+                        excel_file = read_excel_file(file_path, filename=filename, password=file_password)
+                        sheet_names = excel_file.sheet_names
+                except Exception as ex_err:
+                    logger.error(f"[ASYNC TASK] Error opening Excel file '{filename}': {ex_err}")
+                    err_msg = str(ex_err)
+                    if "password" in err_msg.lower() or "corrupt" in err_msg.lower() or "encrypted" in err_msg.lower():
+                        raise ValueError(f"Failed to open '{filename}'. The file may be password-protected or corrupt. Please enter the file password.") from ex_err
+                    raise ex_err
 
                 logger.info(f"[ASYNC TASK] Found {len(sheet_names)} sheets in workbook")
 
                 for sheet_name in sheet_names:
-                    row_count = get_sheet_row_count(file_path, sheet_name)
+                    canonical_name = resolve_sheet_name(sheet_name)
+                    if not canonical_name:
+                        logger.info(f"[ASYNC TASK] ℹ Skipping unrecognized / auxiliary sheet: '{sheet_name}'")
+                        continue
+
+                    row_count = get_sheet_row_count(file_path, sheet_name, password=file_password)
                     all_sheet_info[file_path][sheet_name] = {
                         'row_count': row_count,
                         'use_chunking': row_count > LARGE_SHEET_THRESHOLD,
-                        'cleaned_name': clean_sheet_name(sheet_name),
+                        'cleaned_name': canonical_name,
                         'is_csv': False,
                     }
                     combined_sheet_names.append(sheet_name)
@@ -1020,7 +1241,9 @@ def process_uploaded_file(upload_session_id, file_paths, original_filenames,
             
             for sheet_name, info in file_info.items():
                 cleaned_name = info['cleaned_name']
-                
+                if cleaned_name not in RECOGNIZED_CANONICAL_SHEETS:
+                    continue
+
                 # Collect ALL sheets by type (don't skip duplicates - we'll merge them!)
                 if cleaned_name not in sheets_by_type:
                     sheets_by_type[cleaned_name] = []
@@ -1070,11 +1293,15 @@ def process_uploaded_file(upload_session_id, file_paths, original_filenames,
                         _sep = detect_csv_delimiter(file_path, encoding=_enc)
                         df = pd.read_csv(file_path, header=header_row, sep=_sep, na_filter=False, dtype=object, encoding=_enc, encoding_errors='replace')
                     else:
-                        header_row = find_header_row(file_path, sheet_name)
+                        header_row = find_header_row(file_path, sheet_name, password=file_password)
                         logger.info(f"[ASYNC TASK] Loading '{sheet_name}' from {os.path.basename(file_path)} with header at row {header_row}")
-                        # Determine engine based on file extension (.xlsb requires pyxlsb)
-                        engine = 'pyxlsb' if file_path.lower().endswith('.xlsb') else None
-                        df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row, na_filter=False, dtype=object, engine=engine)
+                        filename = os.path.basename(file_path)
+                        if file_path.lower().endswith('.xlsb'):
+                            engine = 'pyxlsb'
+                            df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row, na_filter=False, dtype=object, engine=engine)
+                        else:
+                            excel_file = read_excel_file(file_path, filename=filename, password=file_password)
+                            df = pd.read_excel(excel_file, sheet_name=sheet_name, header=header_row, na_filter=False, dtype=object)
 
 
                     # Convert all columns to string and clean nulls
@@ -1188,6 +1415,7 @@ def process_uploaded_file(upload_session_id, file_paths, original_filenames,
         sheet_list = list(xds.keys())
         total_sheets = len(sheet_list)
         for idx, sheet_name in enumerate(sheet_list):
+            check_cancellation(upload_session_id)
             progress = 15 + (idx * 40 // total_sheets)  # Progress from 15% to 55%
             cleaned_name = clean_sheet_name(sheet_name)
             
@@ -1344,6 +1572,7 @@ def process_uploaded_file(upload_session_id, file_paths, original_filenames,
         # ========================================================================
         # VALIDATE REQUIRED COLUMNS (After Renaming, Before Processing)
         # ========================================================================
+        check_cancellation(upload_session_id)
         upload_session.update_progress('data_cleaning', 54, 'Validating required columns...')
         
         logger.info(f"[[VALIDATION] Starting column validation for {len(processed_sheets)} sheets")
@@ -1500,34 +1729,45 @@ def process_uploaded_file(upload_session_id, file_paths, original_filenames,
             
             # Store the actual unmatched count in upload session for result page display
             upload_session.unmatched_credit_records = actual_unmatched_count
-            upload_session.save()
+            upload_session.save(update_fields=['unmatched_credit_records'])
             logger.info(f"[[UNMATCHED CREDITS] Stored ground truth count in upload_session: {actual_unmatched_count}")
             
             # Now safe to delete credit DataFrame
             del credit
             gc.collect()
         
+        check_cancellation(upload_session_id)
         upload_session.update_progress('credit_matching', 75, 'Credit matching complete, identifying split candidates...')
         
         # Save merged data to Parquet before splitting (needed for post-verification)
         save_to_parquet(indi, upload_session_id, 'merged_individual')
         save_to_parquet(corpo, upload_session_id, 'merged_corporate')
         
-        # Split commercial/consumer entities — each returns (remaining, auto_move, manual_review)
-        split_indi, auto_commercial, split_candidates_commercial = split_commercial_entities(indi)
-        split_corpo, auto_consumer, split_candidates_consumer = split_consumer_entities(corpo)
+        # Split commercial/consumer entities unless 'no_split' is selected
+        if split_option == 'no_split':
+            logger.info("[SPLIT CHOICE] User selected 'no_split' - skipping entity splitting for merged files")
+            split_indi = indi.copy()
+            split_corpo = corpo.copy()
+            auto_commercial = pd.DataFrame()
+            split_candidates_commercial = pd.DataFrame()
+            auto_consumer = pd.DataFrame()
+            split_candidates_consumer = pd.DataFrame()
+        else:
+            # Split commercial/consumer entities — each returns (remaining, auto_move, manual_review)
+            split_indi, auto_commercial, split_candidates_commercial = split_commercial_entities(indi)
+            split_corpo, auto_consumer, split_candidates_consumer = split_consumer_entities(corpo)
 
-        # Auto-merge high-confidence splits directly into the destination bucket (no UI needed)
-        from .map import guarantor_columns_to_clear, principal_officer_columns_to_clear
-        if not auto_commercial.empty:
-            confirmed_commercial = transform_to_commercial(auto_commercial, columns_to_clear=guarantor_columns_to_clear)
-            logger.info(f"[AUTO-SPLIT] Auto-moving {len(confirmed_commercial)} commercial records directly to corporate (skipping UI)")
-            split_corpo = pd.concat([split_corpo, confirmed_commercial], ignore_index=True)
+            # Auto-merge high-confidence splits directly into the destination bucket (no UI needed)
+            from .map import guarantor_columns_to_clear, principal_officer_columns_to_clear
+            if not auto_commercial.empty:
+                confirmed_commercial = transform_to_commercial(auto_commercial, columns_to_clear=guarantor_columns_to_clear)
+                logger.info(f"[AUTO-SPLIT] Auto-moving {len(confirmed_commercial)} commercial records directly to corporate (skipping UI)")
+                split_corpo = pd.concat([split_corpo, confirmed_commercial], ignore_index=True)
 
-        if not auto_consumer.empty:
-            confirmed_consumer = transform_to_consumer(auto_consumer, columns_to_clear=principal_officer_columns_to_clear)
-            logger.info(f"[AUTO-SPLIT] Auto-moving {len(confirmed_consumer)} consumer records directly to individual (skipping UI)")
-            split_indi = pd.concat([split_indi, confirmed_consumer], ignore_index=True)
+            if not auto_consumer.empty:
+                confirmed_consumer = transform_to_consumer(auto_consumer, columns_to_clear=principal_officer_columns_to_clear)
+                logger.info(f"[AUTO-SPLIT] Auto-moving {len(confirmed_consumer)} consumer records directly to individual (skipping UI)")
+                split_indi = pd.concat([split_indi, confirmed_consumer], ignore_index=True)
         
         # Clear original merged data from memory (keep only split versions)
         del indi, corpo
@@ -1634,12 +1874,27 @@ def process_uploaded_file(upload_session_id, file_paths, original_filenames,
                 consumer_count=len(consumer_records)
             )
             
-            upload_session.save()
+            upload_session.save(update_fields=['processing_data'])
             
             logger.info(f"[[ASYNC TASK] Processing complete for UploadSession {upload_session_id}")
             logger.info(f"[[ASYNC TASK] Awaiting human verification: {len(commercial_records)} commercial, {len(consumer_records)} consumer candidates")
         
+    except UploadCancelledException:
+        logger.info(f"[ASYNC TASK] UploadSession {upload_session_id} was cancelled by user. Terminating background processing cleanly.")
+        try:
+            cleanup_temp_files(upload_session_id, keep_unmatched_credits=False)
+        except Exception:
+            pass
+        return
     except Exception as e:
+        if is_session_cancelled(upload_session_id):
+            logger.info(f"[ASYNC TASK] UploadSession {upload_session_id} was cancelled by user during execution ({e}). Aborting cleanly.")
+            try:
+                cleanup_temp_files(upload_session_id, keep_unmatched_credits=False)
+            except Exception:
+                pass
+            return
+
         import traceback
         error_details = traceback.format_exc()
         logger.info(f"[ASYNC TASK ERROR] {error_details}")
@@ -1650,7 +1905,7 @@ def process_uploaded_file(upload_session_id, file_paths, original_filenames,
             upload_session.mark_failed(error_message=str(e))
             
             # Cleanup temp Parquet files on error
-            cleanup_temp_files(upload_session_id)
+            cleanup_temp_files(upload_session_id, keep_unmatched_credits=False)
         except Exception:
             pass
         
@@ -1696,7 +1951,12 @@ def process_post_verification(upload_session_id, use_parquet=True,
     try:
         logger.info(f"[POST-VERIFICATION TASK] Starting post-verification processing for UploadSession {upload_session_id}")
         
+        check_cancellation(upload_session_id)
         upload_session = UploadSession.objects.get(id=upload_session_id)
+        if upload_session.status == 'cancelled' or is_session_cancelled(upload_session_id):
+            logger.info(f"[POST-VERIFICATION TASK] UploadSession {upload_session_id} is cancelled. Aborting task.")
+            cleanup_temp_files(upload_session_id, keep_unmatched_credits=False)
+            return
         
         # Update progress to post-verification stage
         upload_session.update_progress('post_verification', 85, 'Processing verification results...')
@@ -1720,6 +1980,7 @@ def process_post_verification(upload_session_id, use_parquet=True,
         verification_submitted = processing_data.get('verification_submitted', False)
         
         if verification_submitted:
+            check_cancellation(upload_session_id)
             logger.info("[POST-VERIFICATION] Applying user verification decisions...")
             upload_session.update_progress('post_verification', 86, 'Applying verification decisions...')
             
@@ -1839,6 +2100,7 @@ def process_post_verification(upload_session_id, use_parquet=True,
         # ========================================================================
         # APPLY FINAL TRANSFORMATIONS
         # ========================================================================
+        check_cancellation(upload_session_id)
         upload_session.update_progress('post_verification', 88, 'Applying final data transformations...')
         indi = modify_middle_names(indi)
         corpo = modify_middle_names(corpo)
@@ -1877,6 +2139,7 @@ def process_post_verification(upload_session_id, use_parquet=True,
         # ========================================================================
         # DATA QUALITY VALIDATION (After duplicates and blank rows removed)
         # ========================================================================
+        check_cancellation(upload_session_id)
         upload_session.update_progress('post_verification', 89, 'Applying data quality validation...')
         
         indi, corpo, excluded_indi, excluded_corpo = apply_data_quality_validation(indi, corpo)
@@ -1917,6 +2180,7 @@ def process_post_verification(upload_session_id, use_parquet=True,
         
         # Note: unmatched_credit_records was already calculated and stored during process_uploaded_file()
         # We preserve that ground truth value instead of recalculating here
+        check_cancellation(upload_session_id)
         upload_session.update_progress('output_generation', 90, 'Generating output files...')
         
         # ========================================================================
@@ -1961,6 +2225,7 @@ def process_post_verification(upload_session_id, use_parquet=True,
         
         # Only generate file if there are actual data rows
         if individual_row_count > 0 and not indi.empty:
+            check_cancellation(upload_session_id)
             if individual_row_count > EXCEL_ROW_THRESHOLD:
                 # Generate TXT for large individual sheet
                 logger.info(f"[[OUTPUT] Individual sheet has {individual_row_count} rows - generating TXT (threshold: {EXCEL_ROW_THRESHOLD})")
@@ -2086,10 +2351,20 @@ def process_post_verification(upload_session_id, use_parquet=True,
         upload_session.excluded_individual_records = excluded_indi_count
         upload_session.excluded_corporate_records = excluded_corpo_count
         
+        # Check if cancelled before persisting and sending email report
+        if is_session_cancelled(upload_session_id):
+            logger.info(f"[POST-VERIFICATION] UploadSession {upload_session_id} was cancelled by user. Suppressing completion and email.")
+            cleanup_temp_files(upload_session_id, keep_unmatched_credits=False)
+            return
+
         # IMPORTANT: Save file paths and output data BEFORE calling mark_completed()
-        # mark_completed() uses save(update_fields=[...]) which doesn't include file paths,
-        # so we must persist them first to ensure download links appear for multi-subscriber users
-        upload_session.save()
+        # Uses explicit update_fields so it NEVER overwrites status
+        upload_session.save(update_fields=[
+            'individual_file_path', 'corporate_file_path',
+            'individual_output_format', 'corporate_output_format',
+            'individual_credit_matched', 'corporate_credit_matched',
+            'excluded_individual_records', 'excluded_corporate_records'
+        ])
         
         # Recalculate actual record counts from final DataFrames
         # (async calls may pass 0 for these values, so we need to use actual counts)
@@ -2098,62 +2373,137 @@ def process_post_verification(upload_session_id, use_parquet=True,
         
         logger.info(f"[POST-VERIFICATION] Final record counts: individual={actual_individual_count}, corporate={actual_corporate_count}")
         
-        # Mark as completed (uses update_fields to only update status-related fields)
+        # Mark as completed
         upload_session.mark_completed(
             individual_count=actual_individual_count,
             corporate_count=actual_corporate_count,
             processing_time=None  # Can calculate if needed
         )
         
+        # Check actual database status and cancellation sentinel rather than relying on mark_completed return
+        upload_session.refresh_from_db()
+        if upload_session.status == 'cancelled' or is_session_cancelled(upload_session_id):
+            logger.info(f"[POST-VERIFICATION] UploadSession {upload_session_id} was cancelled. Suppressing email report.")
+            cleanup_temp_files(upload_session_id, keep_unmatched_credits=False)
+            return
+        
         # ========================================================================
         # EMAIL REPORT: Send analysis report to the user who uploaded the file
         # ========================================================================
         try:
+            if is_session_cancelled(upload_session_id):
+                logger.info(f"[EMAIL REPORT] UploadSession {upload_session_id} was cancelled. Suppressing email report.")
+                return
 
-            
             user_email = upload_session.user.email if upload_session.user else None
             if user_email:
+                if is_session_cancelled(upload_session_id):
+                    logger.info(f"[EMAIL REPORT] UploadSession {upload_session_id} was cancelled. Suppressing email report.")
+                    return
+
                 user_display = upload_session.user.get_full_name() or upload_session.user.username
-                logger.info(f"[EMAIL REPORT] Sending report to {user_email} for session {upload_session_id}")
+                logger.info(f"[EMAIL REPORT] Preparing report email for {user_email} (session {upload_session_id})")
                 
                 # Build report (reuses same function as portal download)
                 buffer, report_filename = build_excel_report(upload_session, user=upload_session.user)
-                
-                # Compose email
+                report_bytes = buffer.getvalue()
+                report_size = len(report_bytes)
+                is_attached = report_size < 20 * 1024 * 1024  # 20MB limit
+
+                # Compose subject
                 subject = f"FCB Processing Report - {subscriber_name} - {final_month}/{final_year}" if final_month and final_year else f"FCB Processing Report - {subscriber_name}"
-                body = (
-                    f"Dear {user_display},\n\n"
-                    f"Your data processing for {subscriber_name} has been completed successfully.\n\n"
-                    f"Processing Summary:\n"
-                    f"  - Individual Records: {actual_individual_count:,}\n"
-                    f"  - Corporate Records: {actual_corporate_count:,}\n"
-                    f"  - Unmatched Credits: {upload_session.unmatched_credit_records or 0:,}\n\n"
-                    f"The detailed analysis report is attached as an Excel file.\n\n"
-                    f"Best regards,\n"
-                    f"FCB Auto Processing System"
-                )
                 
-                email = EmailMessage(
+                # Reporting period string
+                reporting_period = f"{final_month}/{final_year}" if final_month and final_year else None
+                
+                # Excluded record counts
+                excluded_individual = upload_session.excluded_individual_records or 0
+                excluded_corporate = upload_session.excluded_corporate_records or 0
+                total_excluded = excluded_individual + excluded_corporate
+
+                # Format clean output filenames for report email (strips internal SUBID_YYYYMMDD_TypeDigit_ prefix)
+                clean_consumer_filename = re.sub(r'^[^_]+_\d+_\d+_', '', indi_output_filename) if indi_output_filename else None
+                clean_commercial_filename = re.sub(r'^[^_]+_\d+_\d+_', '', corpo_output_filename) if corpo_output_filename else None
+
+                # Template context for branded report email
+                context = {
+                    'user_display': user_display,
+                    'subscriber_name': subscriber_name,
+                    'reporting_period': reporting_period,
+                    'individual_count': f"{actual_individual_count:,}",
+                    'corporate_count': f"{actual_corporate_count:,}",
+                    'unmatched_credit_count': f"{upload_session.unmatched_credit_records or 0:,}",
+                    'excluded_count': f"{total_excluded:,}",
+                    'excluded_individual': f"{excluded_individual:,}",
+                    'excluded_corporate': f"{excluded_corporate:,}",
+                    'has_excluded_records': total_excluded > 0,
+                    'consumer_output_file': clean_consumer_filename,
+                    'commercial_output_file': clean_commercial_filename,
+                    'is_attached': is_attached,
+                }
+
+                html_content = render_to_string('emails/processing_report.html', context)
+                try:
+                    text_content = render_to_string('emails/processing_report.txt', context)
+                except Exception:
+                    text_content = strip_tags(html_content)
+
+                email = EmailMultiAlternatives(
                     subject=subject,
-                    body=body,
+                    body=text_content,
                     from_email=django_settings.DEFAULT_FROM_EMAIL,
                     to=[user_email],
                 )
+                email.attach_alternative(html_content, "text/html")
                 
-                # Attach report (check size < 20MB)
-                report_bytes = buffer.getvalue()
-                if len(report_bytes) < 20 * 1024 * 1024:  # 20MB limit
-                    email.attach(report_filename, report_bytes, 
-                                 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                    email.send(fail_silently=False)
-                    logger.info(f"[EMAIL REPORT] Report sent successfully to {user_email}")
+                # Attach Excel report if under 20MB limit
+                if is_attached:
+                    email.attach(
+                        report_filename, 
+                        report_bytes, 
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    )
+                    logger.info(f"[EMAIL REPORT] Attached {report_filename} ({report_size:,} bytes)")
                 else:
-                    logger.info(f"[EMAIL REPORT] Report too large ({len(report_bytes)} bytes), skipping attachment")
+                    logger.info(f"[EMAIL REPORT] Report too large ({report_size:,} bytes), provided portal download link instead")
+
+                # Strict final check right before sending over network
+                if is_session_cancelled(upload_session_id):
+                    logger.info(f"[EMAIL REPORT] UploadSession {upload_session_id} was cancelled immediately prior to send. Aborting.")
+                    return
+
+                email.send(fail_silently=False)
+                logger.info(f"[EMAIL REPORT] Report email successfully sent to {user_email}")
             else:
                 logger.info(f"[EMAIL REPORT] No email set for user {upload_session.user}, skipping")
         except Exception as email_error:
             # Email failure should NEVER break the processing pipeline
-            logger.error(f"[EMAIL REPORT ERROR] Failed to send email: {email_error}")
+            logger.error(f"[EMAIL REPORT ERROR] Failed to send email: {email_error}", exc_info=True)
+
+        # ========================================================================
+        # BUREAU ADMIN ALERT: Notify bureau staff of completed submission
+        # ========================================================================
+        try:
+            if not is_session_cancelled(upload_session_id):
+                import calendar
+                if final_month and final_year:
+                    try:
+                        admin_period_str = f"{calendar.month_name[int(final_month)]} {final_year}"
+                    except Exception:
+                        admin_period_str = f"{final_month}/{final_year}"
+                else:
+                    admin_period_str = "Current Period"
+
+                admin_total_records = (actual_individual_count or 0) + (actual_corporate_count or 0)
+                send_admin_completion_alert(
+                    upload_session=upload_session,
+                    subscriber_name=subscriber_name,
+                    reporting_period=admin_period_str,
+                    total_records=admin_total_records
+                )
+        except Exception as alert_error:
+            logger.error(f"[ADMIN ALERT ERROR] Failed to send bureau admin alert: {alert_error}", exc_info=True)
+
         
         # ========================================================================
         # CLEANUP: Delete temporary Parquet files after successful completion
@@ -2162,16 +2512,24 @@ def process_post_verification(upload_session_id, use_parquet=True,
         
         logger.info(f"[POST-VERIFICATION TASK] Processing complete for UploadSession {upload_session_id}")
         logger.info(f"[POST-VERIFICATION TASK] Files generated: individual={indi_output_filename or 'None (skipped)'}, corporate={corpo_output_filename or 'None (skipped)'}")
+ 
         
-        # Log download links for debugging multi-subscriber issues
-        if indi_processed_file_url or corpo_processed_file_url:
-            logger.info(f"[DOWNLOAD LINKS] Generated for session {upload_session_id} (subscriber: {subscriber_name})")
-            if indi_processed_file_url:
-                logger.info(f"[DOWNLOAD LINKS]   Individual: {indi_processed_file_url}")
-            if corpo_processed_file_url:
-                logger.info(f"[DOWNLOAD LINKS]   Corporate: {corpo_processed_file_url}") 
-        
+    except UploadCancelledException:
+        logger.info(f"[POST-VERIFICATION TASK] UploadSession {upload_session_id} was cancelled by user. Terminating background execution cleanly without sending email.")
+        try:
+            cleanup_temp_files(upload_session_id, keep_unmatched_credits=False)
+        except Exception:
+            pass
+        return
     except Exception as e:
+        if is_session_cancelled(upload_session_id):
+            logger.info(f"[POST-VERIFICATION TASK] UploadSession {upload_session_id} was cancelled by user during execution ({e}). Aborting cleanly without email.")
+            try:
+                cleanup_temp_files(upload_session_id, keep_unmatched_credits=False)
+            except Exception:
+                pass
+            return
+
         import traceback
         error_details = traceback.format_exc()
         logger.info(f"[POST-VERIFICATION TASK ERROR] {error_details}")
@@ -2182,7 +2540,7 @@ def process_post_verification(upload_session_id, use_parquet=True,
             upload_session.mark_failed(error_message=str(e))
             
             # Cleanup temp files even on error
-            cleanup_temp_files(upload_session_id)
+            cleanup_temp_files(upload_session_id, keep_unmatched_credits=False)
         except Exception:
             pass
         

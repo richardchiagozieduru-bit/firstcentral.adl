@@ -210,14 +210,22 @@
                         </div>
                     </div>
                     
-                    <div class="mt-4">
-                        <a href="{% url 'auto:upload' %}" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left"></i> Back to Upload
-                        </a>
+                    <div class="mt-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <a href="{% url 'auto:upload' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Back to Upload
+                            </a>
+                            
+                            <button id="refresh-btn" class="btn btn-outline-primary ms-2" onclick="refreshStatus()">
+                                <i class="fas fa-sync-alt me-1"></i> Refresh
+                            </button>
+                        </div>
                         
-                        <button id="refresh-btn" class="btn btn-outline-primary ms-2" onclick="refreshStatus()">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
+                        <div id="cancel-upload-container" class="{% if upload_session.status == 'completed' or upload_session.status == 'cancelled' or upload_session.status == 'failed' or upload_session.status == 'invalidated' %}d-none{% endif %}">
+                            <button id="cancel-upload-btn" class="btn btn-outline-danger" onclick="cancelUploadSession({{ upload_session.id }})">
+                                <i class="fas fa-times-circle me-1"></i> Cancel Upload Processing
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -668,6 +676,16 @@ function updateStatus(data) {
         completionSection.classList.add('d-none');
     }
     
+    // Hide cancel button if completed, failed, or cancelled
+    const cancelContainer = document.getElementById('cancel-upload-container');
+    if (cancelContainer) {
+        if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
+            cancelContainer.classList.add('d-none');
+        } else {
+            cancelContainer.classList.remove('d-none');
+        }
+    }
+
     // Stop polling if task is completed or failed
     if (data.status === 'completed' || data.status === 'failed') {
         stopPolling();
@@ -742,7 +760,16 @@ function getStatusClass(status) {
     return classMap[status] || 'secondary';
 }
 
+let currentTaskStatus = '{{ upload_session.status }}';
+const uploadUrl = "{% url 'auto:upload' %}";
+
 function refreshStatus() {
+    // If task failed, clicking refresh reloads and takes user back to file upload
+    if (currentTaskStatus === 'failed') {
+        window.location.href = uploadUrl;
+        return;
+    }
+
     console.log('[Progress Tracking] Fetching status from:', apiUrl);
     fetch(apiUrl, {
         method: 'GET',
@@ -762,6 +789,16 @@ function refreshStatus() {
         if (data.error) {
             console.error('Error fetching status:', data.error);
         } else {
+            currentTaskStatus = data.status;
+            if (data.status === 'failed') {
+                const refreshBtn = document.getElementById('refresh-btn');
+                if (refreshBtn) {
+                    refreshBtn.innerHTML = '<i class="fas fa-redo me-1"></i> Refresh & Re-upload';
+                    refreshBtn.onclick = function() {
+                        window.location.href = uploadUrl;
+                    };
+                }
+            }
             updateStatus(data);
         }
     })
@@ -921,11 +958,64 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check for validation failure and show modal
     checkValidationFailure();
     
+    if (currentStatus === 'failed') {
+        const refreshBtn = document.getElementById('refresh-btn');
+        if (refreshBtn) {
+            refreshBtn.innerHTML = '<i class="fas fa-redo me-1"></i> Refresh & Re-upload';
+            refreshBtn.onclick = function() {
+                window.location.href = uploadUrl;
+            };
+        }
+    }
+    
     // Only start polling if task is not completed or failed
     if (currentStatus !== 'completed' && currentStatus !== 'failed') {
         startPolling();
     }
 });
+
+// Cancel upload function
+function cancelUploadSession(sessionId) {
+    if (!confirm('Are you sure you want to cancel this file upload processing session?\n\nThis will stop background processing and release the session so you can re-upload.')) {
+        return;
+    }
+    const btn = document.getElementById('cancel-upload-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Cancelling...';
+    }
+    stopPolling();
+    const cancelUrl = `{% url 'auto:cancel_upload' 0 %}`.replace('0', sessionId);
+    fetch(cancelUrl, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert('Upload has been cancelled successfully.');
+            window.location.href = "{% url 'auto:upload' %}";
+        } else {
+            alert(data.error || 'Failed to cancel upload.');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-times-circle me-1"></i> Cancel Upload Processing';
+            }
+            startPolling();
+        }
+    })
+    .catch(err => {
+        alert('An error occurred while cancelling the upload.');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-times-circle me-1"></i> Cancel Upload Processing';
+        }
+        startPolling();
+    });
+}
 
 // Stop polling when page is unloaded
 window.addEventListener('beforeunload', stopPolling);

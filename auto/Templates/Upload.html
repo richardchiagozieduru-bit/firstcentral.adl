@@ -17,6 +17,8 @@
 
   .tabs {
     display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
     margin-bottom: -1px; /* Overlap with card border */
     position: relative;
     z-index: 1;
@@ -246,93 +248,207 @@
   .btn-pdf-export { background-color: #1B3D8C; color: white; border: 1px solid #1B3D8C; font-weight: 500; padding: 0.6rem 1.5rem; border-radius: 6px; text-decoration: none; transition: all 0.3s ease; }
   .btn-pdf-export:hover { background-color: #D4620D; border-color: #D4620D; color: white; text-decoration: none; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(212, 98, 13, 0.3); }
   
-  /* Collapsible Help Section Styles */
-  .help-section {
-    margin-bottom: 1.5rem;
-    border-radius: 8px;
-    overflow: hidden;
-    animation: slideIn 0.5s ease-out, pulseGlow 2s ease-in-out 0.5s 5;
+  /* Guidelines Modal Trigger Button */
+  .btn-guidelines-trigger {
+    background: #ffffff;
+    color: #1B3D8C;
+    border: 1px solid #cbd5e1;
+    padding: 0.45rem 1rem;
+    border-radius: 20px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    margin-bottom: 6px;
+    text-decoration: none;
   }
-  
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+
+  .btn-guidelines-trigger:hover {
+    background: #1B3D8C;
+    color: #ffffff;
+    border-color: #1B3D8C;
+    box-shadow: 0 4px 12px rgba(27, 61, 140, 0.25);
+    transform: translateY(-1px);
   }
-  
-  @keyframes pulseGlow {
+
+  .btn-guidelines-trigger i.pulse-info {
+    color: #F47920;
+    font-size: 1rem;
+    animation: subtleGlow 2.5s infinite ease-in-out;
+  }
+
+  .btn-guidelines-trigger:hover i.pulse-info {
+    color: #ffedd5;
+    animation: none;
+  }
+
+  @keyframes subtleGlow {
     0%, 100% {
-      box-shadow: 0 0 5px rgba(230, 126, 34, 0.4);
+      transform: scale(1);
+      filter: drop-shadow(0 0 1px rgba(244, 121, 32, 0.4));
     }
     50% {
-      box-shadow: 0 0 25px rgba(230, 126, 34, 0.8), 0 0 40px rgba(230, 126, 34, 0.5);
+      transform: scale(1.15);
+      filter: drop-shadow(0 0 6px rgba(244, 121, 32, 0.8));
     }
   }
-  
-  .help-toggle {
+
+  /* Guide Tabs Navigation */
+  .guide-tabs-nav {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .guide-tab-btn {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .guide-tab-btn:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+  }
+
+  .guide-tab-btn.active {
+    background: #1B3D8C;
+    color: white;
+    border-color: #1B3D8C;
+    box-shadow: 0 2px 6px rgba(27, 61, 140, 0.25);
+  }
+
+  .guide-tab-pane {
+    display: none;
+    animation: fadeInGuide 0.25s ease;
+  }
+
+  .guide-tab-pane.active {
+    display: block;
+  }
+
+  @keyframes fadeInGuide {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Spec Cards & Chips inside panes */
+  .spec-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+  }
+
+  .spec-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+  }
+
+  .spec-card-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #1B3D8C;
+    margin-bottom: 0.5rem;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem;
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid #d0d5dd;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 500;
-    color: #344054;
-    transition: all 0.2s ease;
+    gap: 6px;
   }
-  
-  .help-toggle:hover {
-    background: rgba(255, 255, 255, 0.9);
-  }
-  
-  .help-toggle i.fa-chevron-down {
-    transition: transform 0.3s ease;
-  }
-  
-  .help-toggle.active i.fa-chevron-down {
-    transform: rotate(180deg);
-  }
-  
-  .help-content {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease;
-    background: rgba(255, 255, 255, 0.8);
-    border: 1px solid #d0d5dd;
-    border-top: none;
-    border-radius: 0 0 8px 8px;
-  }
-  
-  .help-content.show {
-    max-height: 400px;
-  }
-  
-  .help-content-inner {
-    padding: 1rem;
-  }
-  
-  .help-content ul {
+
+  .spec-card p {
+    font-size: 0.8rem;
+    color: #475569;
     margin: 0;
-    padding-left: 1.5rem;
-    text-align: left;
+    line-height: 1.45;
   }
-  
-  .help-content li {
-    color: #495057;
+
+  .format-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 0.5rem;
+  }
+
+  .format-chip {
+    background: white;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+  }
+
+  .badge-req {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+
+  .badge-opt {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+
+  .rule-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: #334155;
     margin-bottom: 0.5rem;
-    font-size: 0.9rem;
   }
-  
-  .help-content li i {
+
+  .rule-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .rule-item i {
+    margin-top: 3px;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+  }
+
+  .sheet-tag {
+    display: inline-block;
+    background: white;
+    border: 1px solid #cbd5e1;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.75rem;
     color: #1B3D8C;
-    margin-right: 0.5rem;
+    margin-right: 4px;
+    margin-top: 3px;
   }
 
 </style>
@@ -341,30 +457,17 @@
 {% block content %}
 <div class="content-wrapper">
     
-    <!-- File Requirements Guide - At the very top -->
-    {% if current_view == 'upload' and not error_message %}
-    <div class="help-section">
-        <div class="help-toggle" id="helpToggle">
-            <span><i class="fas fa-info-circle me-2"></i>📋 File Requirements Guide - Click to Expand</span>
-            <i class="fas fa-chevron-down"></i>
-        </div>
-        <div class="help-content" id="helpContent">
-            <div class="help-content-inner">
-                <ul>
-                    <li><i class="fas fa-check-circle"></i><strong>Single Workbook:</strong> Upload an Excel file (.xlsx, .xls, .xlsb, .xlsm) or separate delimited text files (.csv, .txt) &mdash; each file must be named after its sheet type (e.g. <em>credit_information.csv</em>, <em>individual_borrowers.txt</em>).</li>
-                    <li><i class="fas fa-check-circle"></i><strong>Required Sheets:</strong> Individual Borrower Template or Corporate Borrower Template, Credit Information (at minimum).</li>
-                    <li><i class="fas fa-check-circle"></i><strong>Optional Sheets:</strong> Principal Officers, Guarantors Information.</li>
-                    <li><i class="fas fa-check-circle"></i><strong>Key Columns:</strong> Each sheet must have Customer ID. Credit Info needs Account Number. Individual Borrowers need BVN or NIN.</li>
-                    <li><i class="fas fa-lightbulb"></i><strong>Tip:</strong> Use consistent Customer IDs across sheets to ensure proper data merging.</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    
     <div class="tabs">
-        <a href="{% url 'auto:upload' %}?view=upload" class="tab-link {% if current_view == 'results' %}inactive{% endif %}" id="upload-tab"><i class="fas fa-upload"></i> Upload File</a>
-        <a href="{% url 'auto:upload' %}?view=results" class="tab-link {% if current_view == 'upload' %}inactive{% endif %}" id="results-tab" {% if not has_results %}style="opacity: 0.5; pointer-events: none;"{% endif %}><i class="fas fa-poll"></i> View Results</a>
+        <div style="display: flex;">
+            <a href="{% url 'auto:upload' %}?view=upload" class="tab-link {% if current_view == 'results' %}inactive{% endif %}" id="upload-tab"><i class="fas fa-upload"></i> Upload File</a>
+            <a href="{% url 'auto:upload' %}?view=results" class="tab-link {% if current_view == 'upload' %}inactive{% endif %}" id="results-tab" {% if not has_results %}style="opacity: 0.5; pointer-events: none;"{% endif %}><i class="fas fa-poll"></i> View Results</a>
+        </div>
+        {% if current_view == 'upload' and not error_message %}
+        <button type="button" class="btn-guidelines-trigger" data-bs-toggle="modal" data-bs-target="#guidelinesModal">
+            <i class="fas fa-info-circle pulse-info"></i>
+            <span>Submission Guidelines</span>
+        </button>
+        {% endif %}
     </div>
 
     {% if current_view == 'upload' and not error_message %}
@@ -375,6 +478,62 @@
         </div>
         <h2>Excel File Upload</h2>
         <p>Upload your Excel file to process borrower data</p> {% endcomment %}
+        <!-- In-Flight Session Card -->
+        {% if in_flight_session %}
+        <div class="mb-4 p-4" style="background: #ffffff; border-radius: 14px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); text-align: left;">
+            <div class="d-flex align-items-start">
+                <div style="background-color: #fffbeb; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-right: 1.25rem; flex-shrink: 0;">
+                    <i class="fas fa-spinner fa-spin text-warning" style="font-size: 1.3rem;"></i>
+                </div>
+                <div style="flex: 1;">
+                    <span class="badge mb-2" style="background-color: #fffbeb; color: #b45309; font-size: 0.78rem; font-weight: 600; padding: 4px 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px;">
+                        <i class="fas fa-circle" style="font-size: 0.45rem;"></i> Processing Active
+                    </span>
+                    <h4 style="font-size: 1.25rem; font-weight: 700; color: #1B3D8C; margin-bottom: 0.5rem;">File Processing In Progress</h4>
+                    <p style="color: #495057; font-size: 0.95rem; margin-bottom: 1rem; line-height: 1.5;">
+                        A file (<strong>{{ in_flight_session.original_filename|default:in_flight_session.filename }}</strong>) is currently being processed for your organization.
+                    </p>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <a href="{% url 'auto:progress_tracking' session_id=in_flight_session.id %}" class="btn btn-sm" style="background-color: #1B3D8C; border-color: #1B3D8C; color: white; padding: 8px 18px; border-radius: 6px; font-weight: 500;">
+                            <i class="fas fa-tasks me-1"></i>Track Live Progress
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="cancelInFlightUpload({{ in_flight_session.id }})" style="padding: 8px 16px; border-radius: 6px; font-weight: 500;">
+                            <i class="fas fa-times-circle me-1"></i>Cancel This Upload
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Quota Lock Banner (when completed session exists for period) -->
+        <div id="quotaLockBanner" class="{% if not is_quota_locked %}d-none{% endif %} mb-4 p-4" style="background: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); text-align: left;">
+            <div class="d-flex align-items-start">
+                <div style="background-color: #ecfdf5; border: 1px solid #d1fae5; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-right: 1.25rem; flex-shrink: 0;">
+                    <i class="fas fa-check-circle" style="color: #10b981; font-size: 1.4rem;"></i>
+                </div>
+                <div style="flex: 1;">
+                    <span class="badge mb-2" style="background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 0.78rem; font-weight: 600; padding: 4px 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px;">
+                        <i class="fas fa-check-circle" style="font-size: 0.75rem;"></i> Monthly Submission Complete
+                    </span>
+                    <h4 style="font-size: 1.25rem; font-weight: 700; color: #1B3D8C; margin-bottom: 0.5rem;" id="lockedTitle">
+                        {{ locked_month_name|default:"Selected Period" }} {{ locked_year|default:"" }} Submission Recorded
+                    </h4>
+                    <p style="color: #495057; font-size: 0.95rem; margin-bottom: 1rem;" id="lockedDescription">
+                        Your organization (<strong>{{ subscriber_name|default:"Your Organization" }}</strong>) has already successfully submitted and finalized credit records for this reporting period.
+                    </p>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <a href="{% url 'auto:upload' %}?view=results" class="btn btn-sm btn-primary" id="lockedResultsLink" style="background-color: #1B3D8C; border-color: #1B3D8C; padding: 8px 18px; border-radius: 6px; font-weight: 500;">
+                            <i class="fas fa-poll me-1"></i>View Results
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openFeedbackForReupload();" style="padding: 8px 16px; border-radius: 6px; font-weight: 500;">
+                            <i class="fas fa-undo-alt me-1"></i>Need to Submit a Correction? Request Unlock
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <form id="uploadForm" method="post" enctype="multipart/form-data">
             {% csrf_token %}
             {{ form.non_field_errors }}
@@ -394,6 +553,7 @@
                         <option value="{{ value }}" {% if form.year.value == value or form.year.field.initial == value %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
+                <span id="quotaCheckingSpinner" class="spinner-border spinner-border-sm text-primary d-none" role="status"></span>
             </div>
             
             <!-- Subscriber Selection Section (only for multi_subscriber users) -->
@@ -411,32 +571,54 @@
             </div>
             {% endif %}
             
-            <!-- File Upload Section -->
-            <div class="drag-drop-area" onclick="document.getElementById('id_file').click()">
-                <div id="upload-prompt">
-                    <div class="drag-drop-icon"><i class="fas fa-cloud-upload-alt"></i></div>
-                    <div class="file-upload-text"><strong>Choose Files</strong> or drag and drop</div>
-                    <div class="file-upload-hint">Excel files (.xlsx, .xls, .xlsb, .xlsm) or delimited text files (.csv, .txt) &mdash; multiple files supported</div>
-                </div>
-                <div id="file-display-area">
-                    <div class="fa-stack fa-2x">
-                        <i class="fas fa-file-alt fa-stack-1x"></i>
-                        <i class="fas fa-check fa-stack-1x" style="color: #198754; margin-left: 1.5em; margin-top: 0.8em; font-size: 0.6em;"></i>
+            <!-- Hidden input for split_option -->
+            <input type="hidden" name="split_option" id="id_split_option" value="split">
+            
+            <!-- Upload Input Section: Disabled/Hidden when quota is locked -->
+            <div id="uploadInputSection" class="{% if is_quota_locked %}d-none{% endif %}">
+                <!-- File Upload Section -->
+                <div class="drag-drop-area" onclick="document.getElementById('id_file').click()">
+                    <div id="upload-prompt">
+                        <div class="drag-drop-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                        <div class="file-upload-text"><strong>Choose Files</strong> or drag and drop</div>
+                        <div class="file-upload-hint">Excel files (.xlsx, .xls, .xlsb, .xlsm) or delimited text files (.csv, .txt) &mdash; multiple files supported</div>
                     </div>
-                    <span id="file-name-text" class="mt-2"></span>
-                    <div id="file-list-container" style="text-align: left; font-size: 0.85rem; color: #495057; max-height: 100px; overflow-y: auto; width: 100%; margin-top: 0.5rem;"></div>
+                    <div id="file-display-area">
+                        <div class="fa-stack fa-2x">
+                            <i class="fas fa-file-alt fa-stack-1x"></i>
+                            <i class="fas fa-check fa-stack-1x" style="color: #198754; margin-left: 1.5em; margin-top: 0.8em; font-size: 0.6em;"></i>
+                        </div>
+                        <span id="file-name-text" class="mt-2"></span>
+                        <div id="file-list-container" style="text-align: left; font-size: 0.85rem; color: #495057; max-height: 100px; overflow-y: auto; width: 100%; margin-top: 0.5rem;"></div>
+                        <button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="event.stopPropagation(); clearSelectedFiles();" style="font-size: 0.8rem; font-weight: 500;">
+                            <i class="fas fa-trash-alt me-1"></i>Remove / Choose Different File
+                        </button>
+                    </div>
+                    <input type="file" name="file" id="id_file" accept=".xlsx,.xls,.xlsb,.xlsm,.csv,.txt" multiple>
                 </div>
-                <input type="file" name="file" id="id_file" accept=".xlsx,.xls,.xlsb,.xlsm,.csv,.txt" multiple>
-            </div>
 
-            <button type="submit" class="btn btn-upload-file" id="uploadButton">
-                <span class="button-content">
-                    <i class="fas fa-upload me-2"></i>Upload Files
-                </span>
-                <span class="spinner-border" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </span>
-            </button>
+                <!-- Password Protected Section (Optional) -->
+                <div style="padding: 10px 0; margin-bottom: 1.5rem; text-align: left;">
+                    <div class="d-flex align-items-center justify-content-between" style="cursor: pointer; background: #f8f9fa; padding: 10px 15px; border-radius: 8px; border: 1px solid #e9ecef;" onclick="document.getElementById('passwordCollapse').classList.toggle('d-none');">
+                        <span style="color: #495057; font-size: 0.875rem; font-weight: 500;">
+                            <i class="fas fa-key me-2" style="color: #1B3D8C;"></i>Password-Protected File? (Optional)
+                        </span>
+                        <small class="text-primary" style="font-weight: 500;">Click to enter password <i class="fas fa-chevron-down ms-1"></i></small>
+                    </div>
+                    <div id="passwordCollapse" class="mt-2 d-none">
+                        <input type="password" name="file_password" id="id_file_password" class="form-control" placeholder="Enter file password" style="font-size: 0.875rem;">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-upload-file" id="uploadButton">
+                    <span class="button-content">
+                        <i class="fas fa-upload me-2"></i>Upload Files
+                    </span>
+                    <span class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </span>
+                </button>
+            </div>
         </form>
     </div>
     {% endif %}
@@ -444,7 +626,7 @@
     {% if current_view == 'results' and success_message %}
     <div class="results-wrapper">
        
-        <div class="alert alert-info mt-3" style="border-left: 4px solid #1B3D8C; background-color: #e8eef8; border-color: #c5d3ef; color: #1B3D8C;">
+        <div class="alert alert-info mt-3" style="background-color: #e8eef8; border: 1px solid #c5d3ef; color: #1B3D8C; border-radius: 8px;">
             <i class="fas fa-info-circle me-2"></i>
             <strong>Credit Distribution Analysis:</strong> The counts below show how credit information records were successfully matched and distributed between individual and corporate borrower categories. 
             {% if total_credit_unmerged_count > 0 %}
@@ -572,6 +754,176 @@
 
 </div>
 
+<!-- Merged File Split Choice Modal -->
+<div class="modal fade" id="mergedSplitModal" tabindex="-1" aria-labelledby="mergedSplitModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+            <div class="modal-header" style="background-color: #1B3D8C; color: white;">
+                <h5 class="modal-title" id="mergedSplitModalLabel">
+                    <i class="fas fa-layer-group me-2"></i>Merged File Handling
+                </h5>
+            </div>
+            <div class="modal-body text-start p-4">
+                <p class="text-muted mb-3" style="font-size: 0.95rem;">
+                    You uploaded a merged file (<strong id="modal-detected-filename" style="color: #1B3D8C;">consumermerged</strong>). Please select how you want this file to be processed:
+                </p>
+                <div class="form-check mb-3 p-3 rounded" style="border: 2px solid #e8eef8; background-color: #f8f9fa; cursor: pointer;">
+                    <input class="form-check-input mt-1" type="radio" name="splitChoiceRadio" id="splitRadioSplit" value="split" checked>
+                    <label class="form-check-label w-100" for="splitRadioSplit" style="cursor: pointer; margin-left: 8px;">
+                        <strong style="color: #1B3D8C;">Split (Recommended)</strong>
+                        <div class="text-muted small mt-1">Extract commercial entities from consumer data and consumer entities from commercial data.</div>
+                    </label>
+                </div>
+                <div class="form-check p-3 rounded" style="border: 2px solid #e8eef8; background-color: #f8f9fa; cursor: pointer;">
+                    <input class="form-check-input mt-1" type="radio" name="splitChoiceRadio" id="splitRadioNoSplit" value="no_split">
+                    <label class="form-check-label w-100" for="splitRadioNoSplit" style="cursor: pointer; margin-left: 8px;">
+                        <strong style="color: #344054;">No Split</strong>
+                        <div class="text-muted small mt-1">Keep all records intact as uploaded without splitting or reclassifying between templates.</div>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer" style="background-color: #f8f9fa;">
+                <button type="button" class="btn btn-primary" id="btnConfirmSplitChoice" style="background-color: #1B3D8C; border: none; padding: 0.6rem 1.5rem; font-weight: 500;">
+                    <i class="fas fa-check me-2"></i>Confirm Selection
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Submission & Compliance Guidelines Modal -->
+<div class="modal fade" id="guidelinesModal" tabindex="-1" aria-labelledby="guidelinesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 20px 60px rgba(0,0,0,0.18); overflow: hidden;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #1B3D8C, #143170); color: white; padding: 1.2rem 1.5rem;">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; font-size: 1.05rem;">
+                        <i class="fas fa-clipboard-check"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title m-0" id="guidelinesModalLabel" style="font-weight: 700; font-size: 1.15rem; color: white;">File Submission &amp; Compliance Guidelines</h5>
+                        <span style="font-size: 0.8rem; opacity: 0.85;">FirstCentral Credit Bureau Upload Specifications</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" style="background: #ffffff;">
+                <!-- Tab Navigation -->
+                <div class="guide-tabs-nav mb-3">
+                    <button type="button" class="guide-tab-btn active" data-tab="modal-tab-formats">
+                        <i class="fas fa-file-invoice"></i> Formats &amp; Submission Policy
+                    </button>
+                    <button type="button" class="guide-tab-btn" data-tab="modal-tab-sheets">
+                        <i class="fas fa-layer-group"></i> Required Worksheets &amp; Key Columns
+                    </button>
+                </div>
+
+                <!-- Tab 1: Formats & Submission Policy -->
+                <div class="guide-tab-pane active" id="modal-tab-formats">
+                    <div class="spec-grid">
+                        <div class="spec-card">
+                            <div class="spec-card-title">
+                                <i class="fas fa-file-excel text-success"></i> Accepted File Types
+                            </div>
+                            <p>Single workbook containing all templates, or multiple files named after each sheet type.</p>
+                            <div class="format-chips">
+                                <span class="format-chip">.xlsx</span>
+                                <span class="format-chip">.xls</span>
+                                <span class="format-chip">.xlsb</span>
+                                <span class="format-chip">.xlsm</span>
+                                <span class="format-chip">.csv / .txt</span>
+                            </div>
+                        </div>
+
+                        <div class="spec-card">
+                            <div class="spec-card-title">
+                                <i class="fas fa-calendar-check text-primary"></i> Monthly Reporting Cycle
+                            </div>
+                            <p>Credit bureau submissions are in-arrears: report previous closed month (e.g. August data submitted in September). One authoritative filing is accepted per organization cycle.</p>
+                        </div>
+
+                        <div class="spec-card">
+                            <div class="spec-card-title">
+                                <i class="fas fa-key text-warning"></i> Password &amp; Format Rules
+                            </div>
+                            <div class="rule-item">
+                                <i class="fas fa-lock text-warning"></i>
+                                <span><strong>Password Protected:</strong> Encrypted Excel workbooks are supported—enter your file password below before uploading.</span>
+                            </div>
+                            <div class="rule-item mt-2">
+                                <i class="fas fa-ban text-danger"></i>
+                                <span><strong>No Mixed Types:</strong> Do not mix CSV and Excel in the same batch.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Required Sheets & Key Columns -->
+                <div class="guide-tab-pane" id="modal-tab-sheets">
+                    <div class="spec-grid">
+                        <div class="spec-card">
+                            <div class="spec-card-title">
+                                <i class="fas fa-star text-danger"></i> Mandatory Sheets (Minimum 2)
+                            </div>
+                            <div class="rule-item">
+                                <span class="badge-req">Required</span>
+                                <span><strong>Borrower Template:</strong> <em>Individual Borrower</em> OR <em>Corporate Borrower</em>.</span>
+                            </div>
+                            <div class="rule-item mt-2">
+                                <span class="badge-req">Required</span>
+                                <span><strong>Credit Information:</strong> Loan facilities, balances, classification, repayment terms.</span>
+                            </div>
+                        </div>
+
+                        <div class="spec-card">
+                            <div class="spec-card-title">
+                                <i class="fas fa-plus-circle text-info"></i> Optional Enrichment Sheets
+                            </div>
+                            <div class="rule-item">
+                                <span class="badge-opt">Optional</span>
+                                <span><strong>Principal Officers:</strong> Directors and executives for corporate facilities.</span>
+                            </div>
+                            <div class="rule-item mt-2">
+                                <span class="badge-opt">Optional</span>
+                                <span><strong>Guarantors:</strong> Third-party facility guarantors and collateral details.</span>
+                            </div>
+                        </div>
+
+                        <div class="spec-card">
+                            <div class="spec-card-title">
+                                <i class="fas fa-link text-primary"></i> Key Columns &amp; Matching
+                            </div>
+                            <div class="rule-item">
+                                <i class="fas fa-id-badge text-primary"></i>
+                                <span><strong>Customer ID:</strong> Must be identical across Borrower and Credit sheets to link facilities.</span>
+                            </div>
+                            <div class="rule-item mt-2">
+                                <i class="fas fa-hashtag text-primary"></i>
+                                <span><strong>Account Number:</strong> Unique facility identifier required for all credit records.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pre-Merged File Single-File Notice -->
+                    <div class="mt-3 p-3" style="background: #f0f7ff; border: 1px solid #bfdbfe; border-radius: 8px;">
+                        <div style="font-size: 0.85rem; font-weight: 700; color: #1B3D8C; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                            <i class="fas fa-layer-group text-primary"></i> Pre-Merged Files Supported (Single File)
+                        </div>
+                        <p style="font-size: 0.8rem; color: #334155; margin: 0; line-height: 1.45;">
+                            If submitting a pre-merged dataset named <code>consumermerged</code> or <code>commercialmerged</code>, it is accepted as a <strong>single self-contained file</strong> (both borrower and credit data combined). The <code>ACCOUNTNUMBER</code> column is mandatory, and you will be prompted to choose automatic entity splitting upon upload.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 0.75rem 1.5rem;">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" style="border-radius: 6px; padding: 6px 18px; font-weight: 500;">
+                    <i class="fas fa-times me-1"></i>Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Select2 JS for searchable dropdowns -->
 {% if is_multi_subscriber %}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
@@ -587,20 +939,93 @@ $(document).ready(function() {
 </script>
 {% endif %}
 
+<!-- SheetJS for client-side sheet tab name inspection -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('id_file');
     const uploadForm = document.getElementById('uploadForm');
     const uploadButton = document.getElementById('uploadButton');
     const dragDropArea = document.querySelector('.drag-drop-area');
+    const splitOptionInput = document.getElementById('id_split_option');
+    const btnConfirmSplitChoice = document.getElementById('btnConfirmSplitChoice');
+    let splitChoiceModalInstance = null;
     
-    // Help section accordion toggle
-    const helpToggle = document.getElementById('helpToggle');
-    const helpContent = document.getElementById('helpContent');
-    if (helpToggle && helpContent) {
-        helpToggle.addEventListener('click', function() {
-            helpToggle.classList.toggle('active');
-            helpContent.classList.toggle('show');
+    if (btnConfirmSplitChoice) {
+        btnConfirmSplitChoice.addEventListener('click', function() {
+            const selectedRadio = document.querySelector('input[name="splitChoiceRadio"]:checked');
+            if (selectedRadio && splitOptionInput) {
+                splitOptionInput.value = selectedRadio.value;
+            }
+            if (splitChoiceModalInstance) {
+                splitChoiceModalInstance.hide();
+            }
+        });
+    }
+
+    // Help section tab switching
+    const guideTabBtns = document.querySelectorAll('.guide-tab-btn');
+    guideTabBtns.forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const targetId = this.getAttribute('data-tab');
+            guideTabBtns.forEach(function(b) { b.classList.remove('active'); });
+            document.querySelectorAll('.guide-tab-pane').forEach(function(p) { p.classList.remove('active'); });
+            this.classList.add('active');
+            const targetPane = document.getElementById(targetId);
+            if (targetPane) {
+                targetPane.classList.add('active');
+            }
+        });
+    });
+
+    /**
+     * Inspect a single file for consumermerged / commercialmerged datasets.
+     * - For CSV/TXT files: checks if the filename contains consumermerged or commercialmerged.
+     * - For Excel workbooks: strictly inspects internal worksheet tab names via SheetJS.
+     * Returns the detected merged sheet/file description, or null if none found.
+     */
+    function detectMergedSheet(file) {
+        return new Promise((resolve) => {
+            const fname = file.name.toLowerCase();
+            const cleanFname = fname.replace(/[^a-zA-Z0-9]/g, '');
+
+            // CSV/TXT files have no sheet tabs — check filename
+            if (fname.endsWith('.csv') || fname.endsWith('.txt')) {
+                if (cleanFname.includes('consumermerged') || cleanFname.includes('commercialmerged')) {
+                    resolve(file.name);
+                } else {
+                    resolve(null);
+                }
+                return;
+            }
+
+            // Excel workbooks — strictly inspect internal worksheet tab names
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', bookSheets: true });
+                    const sheetNames = workbook.SheetNames || [];
+
+                    for (const sn of sheetNames) {
+                        const cleaned = sn.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                        if (cleaned.includes('consumermerged') || cleaned.includes('commercialmerged')) {
+                            resolve(file.name + ' → sheet "' + sn + '"');
+                            return;
+                        }
+                    }
+                    resolve(null);
+                } catch (err) {
+                    console.warn('[SheetJS] Could not inspect file:', file.name, err);
+                    resolve(null);
+                }
+            };
+            reader.onerror = function() {
+                resolve(null);
+            };
+            reader.readAsArrayBuffer(file);
         });
     }
 
@@ -616,12 +1041,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 fileDisplayArea.style.display = 'flex';
                 
                 const fileCount = fileInput.files.length;
+                
                 if (fileCount === 1) {
                     fileNameText.textContent = fileInput.files[0].name;
                     fileListContainer.innerHTML = '';
                 } else {
                     fileNameText.textContent = `${fileCount} files selected`;
-                    // Build file list
                     let listHtml = '<ul style="list-style: none; padding: 0; margin: 0;">';
                     for (let i = 0; i < fileCount; i++) {
                         listHtml += `<li><i class="fas fa-file-excel me-1" style="color: #198754;"></i>${fileInput.files[i].name}</li>`;
@@ -629,6 +1054,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     listHtml += '</ul>';
                     fileListContainer.innerHTML = listHtml;
                 }
+                
+                // Inspect all selected files for merged sheet tabs using SheetJS
+                const inspections = Array.from(fileInput.files).map(f => detectMergedSheet(f));
+                Promise.all(inspections).then(results => {
+                    const mergedDetection = results.find(r => r !== null);
+                    if (mergedDetection) {
+                        const detectedLabel = document.getElementById('modal-detected-filename');
+                        if (detectedLabel) {
+                            detectedLabel.textContent = mergedDetection;
+                        }
+                        const modalEl = document.getElementById('mergedSplitModal');
+                        if (modalEl && typeof bootstrap !== 'undefined') {
+                            splitChoiceModalInstance = new bootstrap.Modal(modalEl);
+                            splitChoiceModalInstance.show();
+                        }
+                    }
+                });
             } else {
                 uploadPrompt.style.display = 'flex';
                 fileDisplayArea.style.display = 'none';
@@ -704,6 +1146,111 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    // Dynamic Quota Check when month or year is changed
+    const monthSelect = document.getElementById('id_month');
+    const yearSelect = document.getElementById('id_year');
+    const quotaLockBanner = document.getElementById('quotaLockBanner');
+    const uploadInputSection = document.getElementById('uploadInputSection');
+    const lockedTitle = document.getElementById('lockedTitle');
+    const lockedDescription = document.getElementById('lockedDescription');
+    const quotaCheckingSpinner = document.getElementById('quotaCheckingSpinner');
+
+    function checkQuota() {
+        if (!monthSelect || !yearSelect) return;
+        const month = monthSelect.value;
+        const year = yearSelect.value;
+        if (!month || !year) return;
+
+        if (quotaCheckingSpinner) quotaCheckingSpinner.classList.remove('d-none');
+
+        fetch(`{% url 'auto:check_quota' %}?month=${month}&year=${year}`)
+            .then(res => res.json())
+            .then(data => {
+                if (quotaCheckingSpinner) quotaCheckingSpinner.classList.add('d-none');
+                if (data.is_locked) {
+                    if (lockedTitle) lockedTitle.innerText = `${data.month_name} ${data.year} Submission Recorded`;
+                    if (lockedDescription) {
+                        lockedDescription.innerHTML = `Your organization (<strong>${data.subscriber_name}</strong>) has already successfully submitted and finalized credit records for this reporting period (File: <em>${data.filename}</em> on ${data.completed_date}).`;
+                    }
+                    if (quotaLockBanner) quotaLockBanner.classList.remove('d-none');
+                    if (uploadInputSection) uploadInputSection.classList.add('d-none');
+                } else {
+                    if (quotaLockBanner) quotaLockBanner.classList.add('d-none');
+                    if (uploadInputSection) uploadInputSection.classList.remove('d-none');
+                }
+            })
+            .catch(err => {
+                if (quotaCheckingSpinner) quotaCheckingSpinner.classList.add('d-none');
+                console.error("Error checking quota:", err);
+            });
+    }
+
+    if (monthSelect && yearSelect) {
+        monthSelect.addEventListener('change', checkQuota);
+        yearSelect.addEventListener('change', checkQuota);
+    }
+
+    // Helper to open the floating feedback modal configured for Re-upload Request
+    window.openFeedbackForReupload = function() {
+        const feedbackBtn = document.getElementById('feedbackBtn');
+        const categorySelect = document.getElementById('categorySelect');
+        const messageInput = document.getElementById('messageInput');
+        if (categorySelect) {
+            categorySelect.value = 'reupload_request';
+        }
+        if (messageInput && monthSelect && yearSelect) {
+            const mText = monthSelect.options[monthSelect.selectedIndex].text;
+            const yText = yearSelect.value;
+            messageInput.placeholder = `Please explain why you need to re-upload for ${mText} ${yText}...`;
+            messageInput.value = `Requesting re-upload permission for reporting period ${mText} ${yText}. Reason: `;
+        }
+        if (feedbackBtn) {
+            feedbackBtn.click();
+        }
+    };
+
+    // Helper to clear staged file selection in drag-and-drop area
+    window.clearSelectedFiles = function() {
+        const fileInput = document.getElementById('id_file');
+        const uploadPrompt = document.getElementById('upload-prompt');
+        const fileDisplayArea = document.getElementById('file-display-area');
+        const fileNameText = document.getElementById('file-name-text');
+        const fileListContainer = document.getElementById('file-list-container');
+        
+        if (fileInput) fileInput.value = '';
+        if (uploadPrompt) uploadPrompt.style.display = 'flex';
+        if (fileDisplayArea) fileDisplayArea.style.display = 'none';
+        if (fileNameText) fileNameText.textContent = '';
+        if (fileListContainer) fileListContainer.innerHTML = '';
+    };
+
+    // Helper to cancel an in-flight upload directly from the upload page banner
+    window.cancelInFlightUpload = function(sessionId) {
+        if (!confirm('Are you sure you want to cancel this in-progress upload session?\n\nThis will terminate background processing and release the lock so you can upload again.')) {
+            return;
+        }
+        const cancelUrl = `{% url 'auto:cancel_upload' 0 %}`.replace('0', sessionId);
+        fetch(cancelUrl, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('Upload processing was cancelled successfully.');
+                window.location.reload();
+            } else {
+                alert(data.error || 'Failed to cancel upload.');
+            }
+        })
+        .catch(err => {
+            alert('An error occurred while cancelling the upload.');
+        });
+    };
 
     // Tab switching functionality - now uses URL navigation for clean state management
     const uploadTab = document.getElementById('upload-tab');

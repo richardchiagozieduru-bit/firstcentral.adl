@@ -147,18 +147,12 @@
       
       .feedback-close-btn:hover { color: #212529; }
       
-      .star-rating { margin-bottom: 1.5rem; }
-      .star-rating label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #495057; font-size: 0.9rem; }
-      .star-rating .stars { display: flex; gap: 4px; }
-      .star-rating .star { font-size: 2rem; color: #dee2e6; cursor: pointer; transition: color 0.15s ease, transform 0.15s ease; }
-      .star-rating .star:hover, .star-rating .star.active { color: #ffc107; }
-      .star-rating .star:hover { transform: scale(1.1); }
       
-      .feedback-category, .feedback-message { margin-bottom: 1.5rem; }
-      .feedback-category label, .feedback-message label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #495057; font-size: 0.9rem; }
-      .feedback-category select, .feedback-message textarea { width: 100%; padding: 0.75rem 1rem; border: 1px solid #dee2e6; border-radius: 8px; font-size: 0.95rem; font-family: inherit; }
-      .feedback-category select:focus, .feedback-message textarea:focus { outline: none; border-color: #1B3D8C; box-shadow: 0 0 0 3px rgba(27, 61, 140, 0.15); }
-      .feedback-message textarea { min-height: 120px; resize: vertical; }
+      .feedback-category, .feedback-message, .feedback-email { margin-bottom: 1.25rem; }
+      .feedback-category label, .feedback-message label, .feedback-email label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #495057; font-size: 0.9rem; }
+      .feedback-category select, .feedback-message textarea, .feedback-email input { width: 100%; padding: 0.75rem 1rem; border: 1px solid #dee2e6; border-radius: 8px; font-size: 0.95rem; font-family: inherit; }
+      .feedback-category select:focus, .feedback-message textarea:focus, .feedback-email input:focus { outline: none; border-color: #1B3D8C; box-shadow: 0 0 0 3px rgba(27, 61, 140, 0.15); }
+      .feedback-message textarea { min-height: 110px; resize: vertical; }
       
       .feedback-submit-btn {
         width: 100%;
@@ -256,7 +250,16 @@
     </nav>
 
     <main class="container" style="padding-top: 80px;">
-
+        {% if messages %}
+        <div class="messages-container mb-3">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
 
         {% block content %}{% endblock %}
     </main>
@@ -276,27 +279,22 @@
                 <button type="button" class="feedback-close-btn" id="feedbackCloseBtn">&times;</button>
             </div>
             <form id="feedbackForm">
-                <div class="star-rating">
-                    <label>How would you rate your experience?</label>
-                    <div class="stars" id="starContainer">
-                        <span class="star" data-rating="1">★</span>
-                        <span class="star" data-rating="2">★</span>
-                        <span class="star" data-rating="3">★</span>
-                        <span class="star" data-rating="4">★</span>
-                        <span class="star" data-rating="5">★</span>
-                    </div>
-                    <input type="hidden" id="ratingInput" name="rating" value="">
-                </div>
                 <div class="feedback-category">
                     <label for="categorySelect">Feedback Type</label>
                     <select id="categorySelect" name="category">
                         <option value="general">General Feedback</option>
+                        <option value="reupload_request">Request Re-upload / Correction</option>
                         <option value="bug">Bug Report</option>
                         <option value="feature">Feature Request</option>
                     </select>
                 </div>
+                <div class="feedback-email">
+                    <label for="feedbackEmail">Contact Email Address</label>
+                    <input type="email" id="feedbackEmail" name="contact_email" value="{{ user.email }}" placeholder="e.g. compliance@yourbank.com" required>
+                    <small style="color: #6c757d; font-size: 0.78rem; margin-top: 4px; display: block;">We will notify you at this email address once your request is reviewed.</small>
+                </div>
                 <div class="feedback-message">
-                    <label for="messageInput">Your Feedback</label>
+                    <label for="messageInput">Your Feedback / Explanation</label>
                     <textarea id="messageInput" name="message" placeholder="Tell us what's on your mind..."></textarea>
                 </div>
                 <button type="submit" class="feedback-submit-btn" id="feedbackSubmitBtn">
@@ -319,14 +317,10 @@
         const feedbackModal = document.getElementById('feedbackModal');
         const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
         const feedbackForm = document.getElementById('feedbackForm');
-        const starContainer = document.getElementById('starContainer');
-        const ratingInput = document.getElementById('ratingInput');
         const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
         const feedbackToast = document.getElementById('feedbackToast');
         
         if (!feedbackBtn || !feedbackModal) return;
-        
-        let selectedRating = 0;
         
         feedbackBtn.addEventListener('click', function() {
             feedbackModal.classList.add('show');
@@ -343,26 +337,10 @@
         feedbackModal.addEventListener('click', function(e) { if (e.target === feedbackModal) closeModal(); });
         document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && feedbackModal.classList.contains('show')) closeModal(); });
         
-        const stars = starContainer.querySelectorAll('.star');
-        stars.forEach(function(star) {
-            star.addEventListener('click', function() {
-                selectedRating = parseInt(this.dataset.rating);
-                ratingInput.value = selectedRating;
-                updateStars();
-            });
-            star.addEventListener('mouseenter', function() { highlightStars(parseInt(this.dataset.rating)); });
-        });
-        starContainer.addEventListener('mouseleave', function() { updateStars(); });
-        
-        function highlightStars(rating) {
-            stars.forEach(function(star) { star.classList.toggle('active', parseInt(star.dataset.rating) <= rating); });
-        }
-        function updateStars() { highlightStars(selectedRating); }
         function resetForm() {
             feedbackForm.reset();
-            selectedRating = 0;
-            ratingInput.value = '';
-            updateStars();
+            const emailInput = document.getElementById('feedbackEmail');
+            if (emailInput) emailInput.value = "{{ user.email|default:''|escapejs }}";
             feedbackSubmitBtn.classList.remove('loading');
             feedbackSubmitBtn.disabled = false;
         }
@@ -374,12 +352,12 @@
         
         feedbackForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            const rating = parseInt(ratingInput.value);
             const category = document.getElementById('categorySelect').value;
+            const contactEmail = document.getElementById('feedbackEmail') ? document.getElementById('feedbackEmail').value.trim() : '';
             const message = document.getElementById('messageInput').value.trim();
             
-            if (!rating || rating < 1 || rating > 5) { showToast('Please select a star rating', false); return; }
-            if (!message) { showToast('Please enter your feedback message', false); return; }
+            if (!contactEmail) { showToast('Please enter your contact email address', false); return; }
+            if (!message) { showToast('Please enter your feedback message or explanation', false); return; }
             
             feedbackSubmitBtn.classList.add('loading');
             feedbackSubmitBtn.disabled = true;
@@ -387,7 +365,7 @@
             fetch('{% url "auto:submit_feedback" %}', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify({ rating: rating, category: category, message: message, page_url: window.location.href })
+                body: JSON.stringify({ category: category, contact_email: contactEmail, message: message, page_url: window.location.href })
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {

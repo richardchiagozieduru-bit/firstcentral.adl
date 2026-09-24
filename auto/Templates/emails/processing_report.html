@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCB Processing Report - {{ subscriber_name }}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333333;
+            -webkit-font-smoothing: antialiased;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 30px auto;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e1e8ed;
+        }
+        .email-header {
+            background: linear-gradient(135deg, #1B3D8C 0%, #143170 100%);
+            padding: 26px 24px;
+            text-align: center;
+            color: #ffffff;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .email-header p {
+            margin: 6px 0 0;
+            font-size: 13px;
+            color: #d1dcf5;
+        }
+        .email-body {
+            padding: 28px 26px;
+        }
+        .greeting {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1B3D8C;
+            margin-bottom: 10px;
+        }
+        .lead-text {
+            font-size: 14px;
+            color: #4a5568;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        /* KPI Summary Stat Grid */
+        .kpi-grid {
+            display: table;
+            width: 100%;
+            margin: 18px 0 22px;
+            border-collapse: separate;
+            border-spacing: 6px 0;
+        }
+        .kpi-cell {
+            display: table-cell;
+            width: 25%;
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 14px 6px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            vertical-align: middle;
+        }
+        .kpi-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1B3D8C;
+            margin: 0 0 4px;
+            line-height: 1.2;
+        }
+        .kpi-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #718096;
+            margin: 0;
+        }
+        /* Output Deliverables Section */
+        .section-heading {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #1B3D8C;
+            margin: 22px 0 10px;
+        }
+        .deliverables-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 8px 0 18px;
+        }
+        .file-item {
+            font-size: 13px;
+            padding: 4px 0;
+            color: #334155;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .file-badge {
+            display: inline-block;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 2px 7px;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+        .badge-consumer {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+        .badge-commercial {
+            background: #fef3c7;
+            color: #b45309;
+        }
+        /* Attachment Banner */
+        .attachment-banner {
+            padding: 14px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+            margin: 20px 0 10px;
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        .email-footer {
+            background-color: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            padding: 18px 24px;
+            text-align: center;
+            font-size: 12px;
+            color: #8c9ba5;
+        }
+        .email-footer p {
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="email-header">
+            <h1>FirstCentral Credit Bureau</h1>
+            <p>Automated Data Loader &bull; Processing Summary</p>
+        </div>
+
+        <!-- Body -->
+        <div class="email-body">
+            <div class="greeting">Dear {{ user_display }},</div>
+            <p class="lead-text">
+                Your data processing batch for <strong>{{ subscriber_name }}</strong>{% if reporting_period %} ({{ reporting_period }}){% endif %} has completed successfully.
+            </p>
+
+            <!-- 4 Core KPI Summary Cards -->
+            <div class="kpi-grid">
+                <div class="kpi-cell">
+                    <div class="kpi-value">{{ individual_count|default:"0" }}</div>
+                    <div class="kpi-label">Individual</div>
+                </div>
+                <div class="kpi-cell">
+                    <div class="kpi-value">{{ corporate_count|default:"0" }}</div>
+                    <div class="kpi-label">Corporate</div>
+                </div>
+                <div class="kpi-cell">
+                    <div class="kpi-value" style="color: #F47920;">{{ unmatched_credit_count|default:"0" }}</div>
+                    <div class="kpi-label">Unmatched</div>
+                </div>
+                <div class="kpi-cell">
+                    <div class="kpi-value" style="color: {% if has_excluded_records %}#dc2626{% else %}#1B3D8C{% endif %};">{{ excluded_count|default:"0" }}</div>
+                    <div class="kpi-label">Excluded</div>
+                </div>
+            </div>
+
+            <!-- Data Quality & Excluded Records Section -->
+            {% if has_excluded_records %}
+            <div class="section-heading" style="color: #9a3412;">Data Quality & Exclusions</div>
+            <div style="background: #fffaf5; border: 1px solid #fed7aa; border-radius: 8px; padding: 12px 16px; margin: 8px 0 18px;">
+                <div style="font-size: 13px; color: #7c2d12; font-weight: 600; margin-bottom: 6px;">
+                    Records Excluded from Output Generation: {{ excluded_count }}
+                </div>
+                <div style="font-size: 12px; color: #431407; line-height: 1.6;">
+                    &bull; <strong>Individual Borrowers Excluded:</strong> {{ excluded_individual|default:"0" }}<br>
+                    &bull; <strong>Corporate Borrowers Excluded:</strong> {{ excluded_corporate|default:"0" }}
+                </div>
+                <div style="font-size: 11px; color: #9a3412; margin-top: 8px; border-top: 1px dashed #fdba74; padding-top: 6px;">
+                    <em>Records were excluded due to missing mandatory identifiers (e.g. valid borrower ID, registration number, or date of birth). Detailed row-by-row records and reasons are provided in <strong>Sheet 3 (&ldquo;Excluded Records&rdquo;)</strong> of the attached Excel report.</em>
+                </div>
+            </div>
+            {% else %}
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px; margin: 8px 0 16px; font-size: 12px; color: #166534;">
+                &#10003; <strong>Zero Exclusions:</strong> All individual and corporate records met mandatory identifier requirements.
+            </div>
+            {% endif %}
+
+            <!-- Generated Output Files -->
+            {% if consumer_output_file or commercial_output_file %}
+            <div class="section-heading">Generated Output Files</div>
+            <div class="deliverables-box">
+                {% if consumer_output_file %}
+                <div class="file-item">
+                    <span class="file-badge badge-consumer">Consumer</span>
+                    <span>{{ consumer_output_file }}</span>
+                </div>
+                {% endif %}
+                {% if commercial_output_file %}
+                <div class="file-item" style="margin-top: 4px;">
+                    <span class="file-badge badge-commercial">Commercial</span>
+                    <span>{{ commercial_output_file }}</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Attachment Notice -->
+            <div class="attachment-banner">
+                <strong>&#128206; Excel Report Attached:</strong> The complete multi-sheet analysis report is attached directly to this email (.xlsx format) for your records.
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="email-footer">
+            <p>&copy; FirstCentral Credit Bureau. All rights reserved.</p>
+            <p>Automated notification &bull; Please do not reply directly to this email.</p>
+        </div>
+    </div>
+</body>
+</html>

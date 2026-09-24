@@ -1,13 +1,17 @@
+import logging
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from auto.models import Subscriber, SubscriberToken, UserSubscriberPermission
+from auto.models import Subscriber
 from .models import UserProfile
+
+logger = logging.getLogger(__name__)
 
 
 class CustomAuthenticationForm(AuthenticationForm):
+
     """
     Custom authentication form with enhanced styling and validation
     """
@@ -36,10 +40,34 @@ class CustomAuthenticationForm(AuthenticationForm):
             field.widget.attrs.update({'class': 'form-control'})
 
 
+from django.core.validators import RegexValidator
+
+username_with_spaces_validator = RegexValidator(
+    regex=r'^[\w\s.@+-]+$',
+    message='Enter a valid username. This value may contain letters, numbers, spaces, and @/./+/-/_ characters.'
+)
+
+# Patch the User model field validators at runtime so full_clean() accepts spaces
+try:
+    User._meta.get_field('username').validators = [username_with_spaces_validator]
+except Exception:
+    pass
+
+
 class CustomUserCreationForm(UserCreationForm):
     """
-    Custom user creation form with styling and email collection
+    Custom user creation form with styling, space-supported usernames, and email collection
     """
+    username = forms.CharField(
+        max_length=150,
+        required=True,
+        validators=[username_with_spaces_validator],
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter your username'
+        }),
+        help_text='Required. 150 characters or fewer. Letters, digits, spaces, and @/./+/-/_ only.'
+    )
     email = forms.EmailField(
         required=True,
         widget=forms.EmailInput(attrs={
@@ -55,6 +83,12 @@ class CustomUserCreationForm(UserCreationForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Ensure model field validators accept spaces for this instance
+        try:
+            self.instance._meta.get_field('username').validators = [username_with_spaces_validator]
+        except Exception:
+            pass
+            
         # Add Bootstrap classes to all fields
         for field_name, field in self.fields.items():
             field.widget.attrs.update({
@@ -72,141 +106,142 @@ class CustomUserCreationForm(UserCreationForm):
             'placeholder': 'Confirm your password'
         })
     
+    def clean_username(self):
+        username = self.cleaned_data.get('username', '').strip()
+        if not username:
+            raise ValidationError('Username cannot be empty.')
+        username_with_spaces_validator(username)
+        if User.objects.filter(username__iexact=username).exists():
+            raise ValidationError('A user with that username already exists.')
+        return username
+
     def clean_email(self):
         email = self.cleaned_data.get('email')
         if User.objects.filter(email=email).exists():
             raise ValidationError('An account with this email already exists.')
         return email
 
+    def _post_clean(self):
+        super()._post_clean()
+        # Ensure default model-level UnicodeUsernameValidator does not inject errors for spaces
+        if 'username' in self._errors:
+            self._errors['username'] = [
+                err for err in self._errors['username']
+                if 'only letters, numbers, and @/./+/-/_' not in str(err)
+            ]
+            if not self._errors['username']:
+                del self._errors['username']
 
-class SubscriberSelectionForm(forms.Form):
+
+
+
+
+
+class AdminUserCreationForm(UserCreationForm):
     """
-    Form for one-time subscriber binding using tokens.
-    This form is only used by users who are not yet bound to a subscriber.
-    After successful validation, the user will be permanently bound to the selected subscriber.
+    Admin form for provisioning organization users in Django Admin.
+    Strictly creates regular organization users bound directly to the selected subscriber.
     """
-    subscriber_name = forms.ChoiceField(
-        label='Select Your Organization',
+    username = forms.CharField(
+        max_length=150,
+        required=True,
+        validators=[username_with_spaces_validator],
+        widget=forms.TextInput(attrs={'class': 'vTextField', 'placeholder': 'Enter username'}),
+        help_text='Required. 150 characters or fewer.'
+    )
+    email = forms.EmailField(
+        required=True,
+        widget=forms.EmailInput(attrs={'class': 'vTextField', 'placeholder': 'organization@bank.com'}),
+        help_text='Required. Reports and notifications will be sent to this email.'
+    )
+    first_name = forms.CharField(
+        max_length=150,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'vTextField'})
+    )
+    last_name = forms.CharField(
+        max_length=150,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'vTextField'})
+    )
+    subscriber = forms.ChoiceField(
+        label='Organization / Subscriber',
         choices=[],
-        widget=forms.Select(attrs={
-            'class': 'form-control',
-            'required': True
-        }),
-        help_text='Choose the organization you want to bind your account to'
+        required=True,
+        help_text='Select the organization this user represents. The account will be permanently bound to this organization.'
     )
-    
-    subscriber_token = forms.CharField(
-        label='One-Time Binding Token',
-        max_length=32,
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Enter your one-time binding token',
-            'required': True
-        }),
-        help_text='Enter the token provided by your organization for account binding'
-    )
-    
+
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'first_name', 'last_name', 'subscriber', 'password1', 'password2')
+
     def __init__(self, *args, **kwargs):
-        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        
-        # Populate all available subscribers for one-time binding
-        # This form is only shown to unbound users, so they can choose any organization
+        # Populate subscriber choices dynamically from MSSQL Subscriber model
+        choices = [('', '--------- Select Organization ---------')]
         try:
-            choices = [('', 'Select your organization...')]
-            
-            # Show all available subscribers
-            subscribers = Subscriber.objects.all().order_by('subscriber_name')
-            choices.extend([
-                (subscriber.subscriber_name, subscriber.subscriber_name)
-                for subscriber in subscribers
-            ])
-                
-            self.fields['subscriber_name'].choices = choices
-            
-            # Update help text for one-time binding
-            self.fields['subscriber_name'].help_text = (
-                'Select the organization you want to permanently bind your account to. '
-                'This is a one-time choice that cannot be changed without administrator assistance.'
-            )
-            
-            self.fields['subscriber_token'].help_text = (
-                'Enter the one-time binding token provided by your organization. '
-                'This token will be consumed after successful binding.'
-            )
-                    
+            for sub in Subscriber.objects.all().order_by('subscriber_name'):
+                choices.append((str(sub.subscriber_id), f"{sub.subscriber_name} (ID: {sub.subscriber_id})"))
         except Exception as e:
-            # Handle database connection issues gracefully
-            self.fields['subscriber_name'].choices = [('', 'Error loading organizations')]
-    
-    def clean(self):
-        cleaned_data = super().clean()
-        subscriber_name = cleaned_data.get('subscriber_name')
-        subscriber_token = cleaned_data.get('subscriber_token')
-        
-        if not subscriber_name or not subscriber_token:
-            return cleaned_data
-        
+            logger.warning(f"Could not load subscriber choices for AdminUserCreationForm: {e}")
+        self.fields['subscriber'].choices = choices
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username', '').strip()
+        if not username:
+            raise ValidationError('Username cannot be empty.')
+        username_with_spaces_validator(username)
+        if User.objects.filter(username__iexact=username).exists():
+            raise ValidationError('A user with that username already exists.')
+        return username
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').strip()
+        if not email:
+            raise ValidationError('Email is required.')
+        if User.objects.filter(email__iexact=email).exists():
+            raise ValidationError('A user with this email address already exists.')
+        return email
+
+    def clean_subscriber(self):
+        subscriber_id_str = self.cleaned_data.get('subscriber')
+        if not subscriber_id_str:
+            raise ValidationError('Please select an organization for this user.')
         try:
-            # Verify user is not already bound
-            if self.user and self.user.is_authenticated:
-                user_profile = UserProfile.get_or_create_profile(self.user)
-                if user_profile.is_bound:
-                    raise ValidationError(
-                        f'Your account is already bound to {user_profile.get_bound_subscriber().subscriber_name}. '
-                        'Contact an administrator if you need to change your binding.'
-                    )
-            
-            # Get the subscriber by name
-            subscriber = Subscriber.objects.get(subscriber_name=subscriber_name)
-            
-            # Validate the token specifically for binding
-            token_obj = SubscriberToken.validate_token_for_binding(
-                subscriber_token, 
-                subscriber.subscriber_id
-            )
-            
-            if not token_obj:
-                raise ValidationError(
-                    'Invalid or already used token for the selected organization. '
-                    'Please check your token or contact your administrator for a new one.'
-                )
-            
-            # Check if token has expired
-            if token_obj.expiry_date and token_obj.expiry_date < timezone.now():
-                raise ValidationError(
-                    'This token has expired. Please contact your administrator for a new token.'
-                )
-            
-            # Store validated objects for use in the view
-            cleaned_data['validated_subscriber'] = subscriber
-            cleaned_data['validated_token'] = token_obj
-            
-        except Subscriber.DoesNotExist:
-            raise ValidationError(
-                'Selected organization not found. Please refresh the page and try again.'
-            )
-        except Exception as e:
-            raise ValidationError(
-                f'An error occurred during validation: {str(e)}'
-            )
-        
-        return cleaned_data
-    
-    def clean_subscriber_name(self):
-        subscriber_name = self.cleaned_data.get('subscriber_name')
-        if not subscriber_name:
-            raise ValidationError('Please select a subscriber.')
-        return subscriber_name
-    
-    def clean_subscriber_token(self):
-        subscriber_token = self.cleaned_data.get('subscriber_token')
-        if not subscriber_token:
-            raise ValidationError('Please enter a validation token.')
-        
-        # Basic token format validation
-        if len(subscriber_token) < 8:
-            raise ValidationError('Token must be at least 8 characters long.')
-        
-        return subscriber_token.strip()
+            sub_id = int(float(subscriber_id_str))
+            subscriber = Subscriber.objects.get(subscriber_id=sub_id)
+            return subscriber
+        except (ValueError, Subscriber.DoesNotExist):
+            raise ValidationError('Selected organization does not exist.')
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.email = self.cleaned_data['email']
+        user.first_name = self.cleaned_data.get('first_name', '')
+        user.last_name = self.cleaned_data.get('last_name', '')
+        # Strictly regular organization user: NOT staff, NOT superuser, active immediately
+        user.is_staff = False
+        user.is_superuser = False
+        user.is_active = True
+
+        subscriber = self.cleaned_data.get('subscriber')
+
+        def _save_profile():
+            if subscriber and user.pk:
+                sub_id = subscriber.subscriber_id if hasattr(subscriber, 'subscriber_id') else int(subscriber)
+                profile, _ = UserProfile.objects.get_or_create(user=user)
+                profile.bound_subscriber_id = sub_id
+                profile.is_bound = True
+                profile.binding_method = 'admin'
+                profile.bound_at = timezone.now()
+                profile.save()
+
+        self.save_m2m = _save_profile
+
+        if commit:
+            user.save()
+            _save_profile()
+        return user
+
+
 

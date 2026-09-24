@@ -5,116 +5,12 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.contrib import messages
 from django.http import HttpResponse
-from django.template.response import TemplateResponse
 from django.shortcuts import render
 from django import forms
-from .models import Subscriber, SubscriberToken, UserSubscriberPermission, Feedback
+import calendar
+from .models import Subscriber, UserSubscriberPermission, Feedback, UploadSession
 
 
-class SubscriberMultipleChoiceField(forms.ModelMultipleChoiceField):
-    """
-    Custom field that handles float subscriber IDs from MSSQL database
-    """
-    def validate(self, value):
-        """Override validation to handle float primary keys"""
-        if self.required and not value:
-            raise forms.ValidationError(self.error_messages['required'], code='required')
-        
-        # Convert float IDs to match the actual database values
-        if value:
-            # Get all subscriber objects and create a mapping
-            all_subscribers = list(self.queryset.all())
-            pk_map = {}
-            
-            # Create mapping for both int and float representations
-            for subscriber in all_subscribers:
-                pk_value = subscriber.pk
-                if pk_value is not None:  # Check for None values
-                    pk_map[str(pk_value)] = subscriber
-                    try:
-                        pk_map[str(int(float(pk_value)))] = subscriber  # Handle "44.0" -> "44"
-                    except (ValueError, TypeError):
-                        pass  # Skip invalid values
-            
-            # Validate each selected value
-            for pk in value:
-                if str(pk) not in pk_map:
-                    raise forms.ValidationError(
-                        self.error_messages['invalid_choice'],
-                        code='invalid_choice',
-                        params={'value': pk},
-                    )
-    
-    def _check_values(self, value):
-        """Override to handle float/int conversion"""
-        # Get all valid PKs in both formats
-        all_subscribers = list(self.queryset.all())
-        valid_pks = set()
-        
-        for subscriber in all_subscribers:
-             pk_value = subscriber.pk
-             if pk_value is not None:  # Check for None values
-                 valid_pks.add(str(pk_value))
-                 try:
-                     valid_pks.add(str(int(float(pk_value))))  # Add integer version
-                 except (ValueError, TypeError):
-                     pass  # Skip invalid values
-        
-        # Filter to only valid objects
-        result = []
-        for pk in value:
-            if str(pk) in valid_pks:
-                 # Find the actual subscriber object
-                 for subscriber in all_subscribers:
-                     if subscriber.pk is not None:
-                         try:
-                             if str(subscriber.pk) == str(pk) or str(int(float(subscriber.pk))) == str(pk):
-                                 result.append(subscriber)
-                                 break
-                         except (ValueError, TypeError):
-                             continue  # Skip invalid values
-        
-        return result
-
-
-class BulkTokenGenerationForm(forms.Form):
-    """
-    Form for bulk token generation
-    """
-    subscribers = SubscriberMultipleChoiceField(
-        queryset=Subscriber.objects.none(),  # Will be set in __init__
-        widget=forms.CheckboxSelectMultiple,
-        required=True,
-        help_text="Select subscribers to generate tokens for"
-    )
-    tokens_per_subscriber = forms.IntegerField(
-        min_value=1,
-        max_value=50,
-        initial=1,
-        help_text="Number of tokens to generate per subscriber (max 50)"
-    )
-    expiry_days = forms.IntegerField(
-        min_value=0,
-        max_value=365,
-        initial=30,
-        required=False,
-        help_text="Token expiry in days (0 = no expiry)"
-    )
-    is_active = forms.BooleanField(
-        initial=True,
-        required=False,
-        help_text="Generate tokens as active"
-    )
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        try:
-            # Set the queryset for subscribers with error handling
-            self.fields['subscribers'].queryset = Subscriber.objects.all()
-        except Exception as e:
-            # If database connection fails, provide empty queryset
-            self.fields['subscribers'].queryset = Subscriber.objects.none()
-            self.fields['subscribers'].help_text = f"Error loading subscribers: {str(e)}"
 
 
 @admin.register(Subscriber)
@@ -140,156 +36,6 @@ class SubscriberAdmin(admin.ModelAdmin):
 
 
 
-@admin.register(SubscriberToken)
-class SubscriberTokenAdmin(admin.ModelAdmin):
-    """
-    Admin interface for SubscriberToken model with bulk generation capabilities
-    """
-    list_display = (
-        'token_display', 'subscriber_info', 'is_active', 
-        'usage_count', 'created_at', 'expiry_date', 'created_by'
-    )
-    list_filter = (
-        'is_active', 'created_at', 'expiry_date', 'created_by'
-    )
-    search_fields = ('token', 'subscriber_id')
-    readonly_fields = ('token', 'created_at', 'last_used_at', 'usage_count')
-    ordering = ('-created_at',)
-    date_hierarchy = 'created_at'
-    actions = ['bulk_generate_tokens', 'deactivate_selected_tokens', 'activate_selected_tokens']
-    
-    fieldsets = (
-        ('Token Information', {
-            'fields': ('token', 'subscriber_id', 'is_active')
-        }),
-        ('Usage & Expiry', {
-            'fields': ('usage_count', 'last_used_at', 'expiry_date')
-        }),
-        ('Metadata', {
-            'fields': ('created_at', 'created_by'),
-            'classes': ('collapse',)
-        })
-    )
-    
-    def get_urls(self):
-        """Add custom URLs for bulk operations"""
-        from django.urls import path
-        urls = super().get_urls()
-        custom_urls = [
-            path('bulk-generate/', self.admin_site.admin_view(self.bulk_generate_view), name='auto_subscribertoken_bulk_generate'),
-        ]
-        return custom_urls + urls
-    
-    def bulk_generate_view(self, request):
-        """Custom view for bulk token generation"""
-        if request.method == 'POST':
-            form = BulkTokenGenerationForm(request.POST)
-            if form.is_valid():
-                return self._process_bulk_generation(request, form)
-        else:
-            form = BulkTokenGenerationForm()
-        
-        context = {
-            'form': form,
-            'title': 'Bulk Generate Subscriber Tokens',
-            'opts': self.model._meta,
-            'has_change_permission': self.has_change_permission(request),
-        }
-        return render(request, 'admin/auto/bulk_token_generation.html', context)
-    
-    def _process_bulk_generation(self, request, form):
-        """Process the bulk token generation"""
-        from django.utils import timezone
-        from datetime import timedelta
-        
-        subscribers = form.cleaned_data['subscribers']
-        tokens_per_subscriber = form.cleaned_data['tokens_per_subscriber']
-        expiry_days = form.cleaned_data['expiry_days']
-        is_active = form.cleaned_data['is_active']
-        
-        # Calculate expiry date
-        expiry_date = None
-        if expiry_days > 0:
-            expiry_date = timezone.now() + timedelta(days=expiry_days)
-        
-        total_tokens_created = 0
-        created_tokens = []
-        
-        try:
-            for subscriber in subscribers:
-                for i in range(tokens_per_subscriber):
-                    token = SubscriberToken.objects.create(
-                        subscriber_id=int(subscriber.subscriber_id),  # Convert to int
-                        is_active=is_active,
-                        expiry_date=expiry_date,
-                        created_by=request.user
-                    )
-                    created_tokens.append(token)
-                    total_tokens_created += 1
-            
-            # Success message
-            messages.success(
-                request,
-                f'Successfully generated {total_tokens_created} tokens for {len(subscribers)} subscribers.'
-            )
-            
-            # Redirect to changelist with filter to show newly created tokens
-            from django.shortcuts import redirect
-            return redirect('admin:auto_subscribertoken_changelist')
-            
-        except Exception as e:
-            messages.error(request, f'Error generating tokens: {str(e)}')
-            form = BulkTokenGenerationForm(request.POST)
-            context = {
-                'form': form,
-                'title': 'Bulk Generate Subscriber Tokens',
-                'opts': self.model._meta,
-                'has_change_permission': self.has_change_permission(request),
-            }
-            return render(request, 'admin/auto/bulk_token_generation.html', context)
-    
-    def bulk_generate_tokens(self, request, queryset):
-        """Admin action to redirect to bulk generation page"""
-        from django.shortcuts import redirect
-        return redirect('admin:auto_subscribertoken_bulk_generate')
-    bulk_generate_tokens.short_description = "Generate tokens in bulk"
-    
-    def deactivate_selected_tokens(self, request, queryset):
-        """Admin action to deactivate selected tokens"""
-        updated = queryset.update(is_active=False)
-        messages.success(request, f'Successfully deactivated {updated} tokens.')
-    deactivate_selected_tokens.short_description = "Deactivate selected tokens"
-    
-    def activate_selected_tokens(self, request, queryset):
-        """Admin action to activate selected tokens"""
-        updated = queryset.update(is_active=True)
-        messages.success(request, f'Successfully activated {updated} tokens.')
-    activate_selected_tokens.short_description = "Activate selected tokens"
-    
-    def token_display(self, obj):
-        """Display truncated token for security"""
-        return f"{obj.token[:8]}...{obj.token[-4:]}"
-    token_display.short_description = 'Token'
-    
-    def subscriber_info(self, obj):
-        """Display subscriber information"""
-        subscriber = obj.get_subscriber()
-        if subscriber:
-            return f"{subscriber.subscriber_name} (ID: {obj.subscriber_id})"
-        return f"Subscriber ID: {obj.subscriber_id} (Not Found)"
-    subscriber_info.short_description = 'Subscriber'
-    
-    def save_model(self, request, obj, form, change):
-        """Set created_by to current user if not set"""
-        if not change and not obj.created_by:
-            obj.created_by = request.user
-        super().save_model(request, obj, form, change)
-    
-    def changelist_view(self, request, extra_context=None):
-        """Add bulk generation button to changelist"""
-        extra_context = extra_context or {}
-        extra_context['bulk_generate_url'] = 'bulk-generate/'
-        return super().changelist_view(request, extra_context)
 
 
 @admin.register(UserSubscriberPermission)
@@ -335,30 +81,204 @@ class UserSubscriberPermissionAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
+@admin.register(UploadSession)
+class UploadSessionAdmin(admin.ModelAdmin):
+    """
+    Admin interface for managing and monitoring upload sessions.
+    Allows administrators to differentiate sessions by organization (subscriber),
+    track status, and invalidate completed sessions to permit re-uploading.
+    """
+    list_display = (
+        'id', 'subscriber_display', 'reporting_period_display', 'user_display',
+        'status_badge', 'filename_display', 'total_records', 'uploaded_at'
+    )
+    list_filter = ('status', 'reporting_year', 'reporting_month', 'uploaded_at')
+    search_fields = ('subscriber_id', 'filename', 'original_filename', 'user__username', 'user__email')
+    ordering = ('-uploaded_at',)
+    date_hierarchy = 'uploaded_at'
+    actions = ['invalidate_and_allow_reupload']
+    
+    fieldsets = (
+        ('Organization & Period', {
+            'fields': ('subscriber_display', 'subscriber_id', 'reporting_month', 'reporting_year', 'user')
+        }),
+        ('Status & Lifecycle', {
+            'fields': ('status', 'processing_stage', 'progress_percentage', 'current_message', 'error_message')
+        }),
+        ('Invalidation / Re-upload Control', {
+            'fields': ('invalidated_at', 'invalidated_by'),
+            'description': 'When invalidated, the monthly quota lock is released for this organization and reporting period.'
+        }),
+        ('File & Output Details', {
+            'fields': ('filename', 'original_filename', 'file_size', 'split_option', 'individual_file_path', 'corporate_file_path'),
+            'classes': ('collapse',)
+        }),
+        ('Processing Metrics', {
+            'fields': ('total_records', 'individual_records', 'corporate_records', 'individual_credit_matched', 'corporate_credit_matched', 'unmatched_credit_records', 'processing_time'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('uploaded_at', 'processing_started_at', 'completed_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    readonly_fields = (
+        'subscriber_display', 'uploaded_at', 'processing_started_at', 
+        'completed_at', 'invalidated_at', 'invalidated_by'
+    )
+
+    def subscriber_display(self, obj):
+        sub_name = obj.get_subscriber_name()
+        return format_html(
+            '<strong style="color: #1B3D8C; font-size: 1.05em;">{}</strong> <span style="color: #6c757d; font-size: 0.85em;">(ID: {})</span>',
+            sub_name, obj.subscriber_id
+        )
+    subscriber_display.short_description = 'Organization'
+    subscriber_display.admin_order_field = 'subscriber_id'
+
+    def reporting_period_display(self, obj):
+        if obj.reporting_month and obj.reporting_year:
+            try:
+                m_name = calendar.month_name[obj.reporting_month]
+                return format_html('<strong>{} {}</strong>', m_name, obj.reporting_year)
+            except Exception:
+                return f"{obj.reporting_month}/{obj.reporting_year}"
+        return mark_safe('<span style="color: #999;">N/A</span>')
+    reporting_period_display.short_description = 'Reporting Period'
+    reporting_period_display.admin_order_field = 'reporting_year'
+
+    def user_display(self, obj):
+        if obj.user:
+            return f"{obj.user.username}"
+        return "System"
+    user_display.short_description = 'Uploaded By'
+    user_display.admin_order_field = 'user__username'
+
+    def filename_display(self, obj):
+        fname = obj.original_filename or obj.filename
+        return fname[:35] + '...' if len(fname) > 35 else fname
+    filename_display.short_description = 'File'
+
+    def status_badge(self, obj):
+        color_map = {
+            'completed': ('#198754', '#e6f9f0', 'Completed'),
+            'processing': ('#0d6efd', '#cfe2ff', 'Processing'),
+            'uploading': ('#0d6efd', '#cfe2ff', 'Uploading'),
+            'awaiting_verification': ('#fd7e14', '#fff3cd', 'Awaiting Review'),
+            'finalizing': ('#0dcaf0', '#cff4fc', 'Finalizing'),
+            'failed': ('#dc3545', '#f8d7da', 'Failed'),
+            'cancelled': ('#6c757d', '#e2e3e5', 'Cancelled'),
+            'invalidated': ('#d63384', '#f8d7da', 'Invalidated (Unlocked)'),
+        }
+        color, bg, label = color_map.get(obj.status, ('#495057', '#e9ecef', obj.get_status_display()))
+        return format_html(
+            '<span style="background-color: {}; color: {}; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.85em;">{}</span>',
+            bg, color, label
+        )
+    status_badge.short_description = 'Status'
+    status_badge.admin_order_field = 'status'
+
+    def invalidate_and_allow_reupload(self, request, queryset):
+        """
+        Admin action to invalidate selected completed upload sessions.
+        Releases the monthly lock for the corresponding organization and reporting period.
+        """
+        from django.utils import timezone
+        unlocked_records = []
+        for session in queryset:
+            sub_name = session.get_subscriber_name()
+            period_str = f"{session.reporting_month}/{session.reporting_year}" if session.reporting_month else "N/A"
+            session.status = 'invalidated'
+            session.invalidated_at = timezone.now()
+            session.invalidated_by = request.user
+            session.save(update_fields=['status', 'invalidated_at', 'invalidated_by'])
+            unlocked_records.append(f"{sub_name} ({period_str})")
+
+        messages.success(
+            request,
+            f"Successfully invalidated {len(unlocked_records)} session(s): {', '.join(unlocked_records)}. "
+            f"The respective organization(s) are now unlocked and permitted to re-upload for that period."
+        )
+    invalidate_and_allow_reupload.short_description = "Invalidate Session (Allow Re-upload for Period)"
+
+    def get_search_results(self, request, queryset, search_term):
+        """
+        Enhances admin search so searching for a bank name (e.g. 'Zenith')
+        matches upload sessions belonging to that subscriber.
+        """
+        queryset, use_distinct = super().get_search_results(request, queryset, search_term)
+        if search_term:
+            try:
+                matching_subs = Subscriber.objects.filter(subscriber_name__icontains=search_term)
+                matching_ids = []
+                for sub in matching_subs:
+                    try:
+                        matching_ids.append(int(float(sub.subscriber_id)))
+                    except (ValueError, TypeError):
+                        pass
+                if matching_ids:
+                    queryset |= self.model.objects.filter(subscriber_id__in=matching_ids)
+            except Exception:
+                pass
+        return queryset, use_distinct
+
+
 @admin.register(Feedback)
 class FeedbackAdmin(admin.ModelAdmin):
     """
-    Admin interface for viewing and managing user feedback
+    Admin interface for viewing and managing user feedback & re-upload requests
     """
     list_display = (
-        'created_at', 'rating_display', 'category', 'user', 
-        'message_preview', 'is_reviewed'
+        'created_at', 'subscriber_display', 'contact_email_display',
+        'category_badge', 'rating_display', 'user', 'message_preview', 'is_reviewed'
     )
     list_filter = ('category', 'rating', 'is_reviewed', 'created_at')
-    search_fields = ('message', 'user__username', 'user__email')
+    search_fields = ('message', 'contact_email', 'user__username', 'user__email')
     ordering = ('-created_at',)
     date_hierarchy = 'created_at'
-    readonly_fields = ('user', 'rating', 'category', 'message', 'page_url', 'created_at')
+    readonly_fields = ('user', 'contact_email', 'rating', 'category', 'message', 'page_url', 'created_at')
     actions = ['mark_as_reviewed']
     
     fieldsets = (
-        ('Feedback Details', {
-            'fields': ('user', 'rating', 'category', 'message', 'page_url', 'created_at')
+        ('Submitter & Contact Information', {
+            'fields': ('user', 'contact_email', 'page_url', 'created_at')
         }),
-        ('Admin Review', {
+        ('Feedback Content', {
+            'fields': ('category', 'rating', 'message')
+        }),
+        ('Admin Review & Resolution', {
             'fields': ('is_reviewed', 'reviewed_at', 'admin_notes'),
         })
     )
+
+    def subscriber_display(self, obj):
+        if obj.user:
+            try:
+                from acctmgt.models import UserProfile
+                profile = UserProfile.objects.filter(user=obj.user, is_bound=True).first()
+                if profile:
+                    sub = profile.get_bound_subscriber()
+                    if sub:
+                        return format_html('<strong>{}</strong>', sub.subscriber_name)
+            except Exception:
+                pass
+        return "N/A"
+    subscriber_display.short_description = 'Organization'
+
+    def contact_email_display(self, obj):
+        email = obj.contact_email or (obj.user.email if obj.user else '')
+        if email:
+            return format_html('<a href="mailto:{}">{}</a>', email, email)
+        return mark_safe('<span style="color: #999;">None</span>')
+    contact_email_display.short_description = 'Contact Email'
+
+    def category_badge(self, obj):
+        if obj.category == 'reupload_request':
+            return mark_safe(
+                '<span style="background-color: #ffebe9; color: #cf222e; padding: 3px 8px; border-radius: 8px; font-weight: bold; border: 1px solid #ff8182;">Re-upload Request</span>'
+            )
+        return obj.get_category_display()
+    category_badge.short_description = 'Category'
     
     def rating_display(self, obj):
         """Display rating as stars"""
@@ -367,7 +287,7 @@ class FeedbackAdmin(admin.ModelAdmin):
     
     def message_preview(self, obj):
         """Display truncated message"""
-        return obj.message[:50] + '...' if len(obj.message) > 50 else obj.message
+        return obj.message[:60] + '...' if len(obj.message) > 60 else obj.message
     message_preview.short_description = 'Message'
     
     def mark_as_reviewed(self, request, queryset):
@@ -382,3 +302,4 @@ class FeedbackAdmin(admin.ModelAdmin):
     
     def has_delete_permission(self, request, obj=None):
         return True  # Allow deletion for cleanup
+

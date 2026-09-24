@@ -15,10 +15,14 @@ class SubscriberSessionMiddleware(MiddlewareMixin):
     EXEMPT_URLS = [
         '/acctmgt/login/',
         '/acctmgt/logout/',
-        '/acctmgt/register/',
-        '/acctmgt/subscriber-selection/',
-        '/acctmgt/clear-subscriber/',
+        '/acctmgt/verify-login-2fa/',
+        '/acctmgt/resend-login-2fa/',
+        '/acctmgt/reset-password/',
+        '/acctmgt/forgot-password/',
+        '/acctmgt/resend-reset-otp/',
+        '/check-upload-quota/',
         '/admin/',
+        '/adl/static/',
         '/static/',
         '/media/',
     ]
@@ -41,44 +45,71 @@ class SubscriberSessionMiddleware(MiddlewareMixin):
         if not request.user.is_authenticated:
             return None
         
+        # Enforce 24-hour absolute security session timeout for non-superusers
+        if not request.user.is_superuser:
+            import time
+            from django.contrib.auth import logout
+            login_time = request.session.get('session_login_time')
+            if login_time:
+                if (time.time() - login_time) > 86400:  # 24 hours
+                    logout(request)
+                    messages.info(
+                        request,
+                        'Your session has reached the 24-hour security limit. Please sign in again.'
+                    )
+                    return redirect('/acctmgt/login/?section=login')
+            else:
+                # Stamp login time if missing
+                request.session['session_login_time'] = time.time()
+        
+        # Staff and superusers have full administrative access and do not require organization binding
+        if request.user.is_staff or request.user.is_superuser:
+            return None
+        
         # Check if user is bound to a subscriber (new binding system)
         from .models import UserProfile
+        from django.contrib.auth import logout
         try:
             # Multi-subscriber users don't need binding - they select subscriber on upload
             if request.user.groups.filter(name='multi_subscriber').exists():
                 return None
             
             user_profile = UserProfile.get_or_create_profile(request.user)
+
+            # Guard against None profile (safety check)
+            if user_profile is None:
+                return redirect('/acctmgt/login/')
             
             if not user_profile.is_bound:
                 # User is authenticated but not bound to any subscriber
-                messages.warning(
+                logout(request)
+                messages.error(
                     request,
-                    'Please complete the one-time binding to your organization before accessing the application.'
+                    'Your account has not yet been assigned to an organization. Please contact First Central Administrator.'
                 )
-                return redirect('acctmgt:subscriber_selection')
+                return redirect('/acctmgt/login/')
             
             # Get bound subscriber information
             bound_subscriber = user_profile.get_bound_subscriber()
             if not bound_subscriber:
                 # Bound but subscriber doesn't exist - data integrity issue
+                logout(request)
                 messages.error(
                     request,
-                    'Unable to retrieve your organization information. Please contact support.'
+                    'Unable to retrieve your organization information. Please contact First Central Administrator.'
                 )
-                return redirect('acctmgt:subscriber_selection')
+                return redirect('/acctmgt/login/')
             
-            # Add subscriber info to request for easy access in views
+            # Add subscriber info to request and session for access across all views & async tasks
             request.subscriber_id = bound_subscriber.subscriber_id
             request.subscriber_name = bound_subscriber.subscriber_name
+            request.session['subscriber_id'] = bound_subscriber.subscriber_id
+            request.session['subscriber_name'] = bound_subscriber.subscriber_name
             
-        except Exception as e:
-            # Handle any database or model errors gracefully
-            messages.error(
-                request,
-                'Error retrieving your organization information. Please try again.'
-            )
-            return redirect('acctmgt:subscriber_selection')
+        except Exception:
+            # Handle any database or model errors gracefully — do NOT redirect here
+            # to avoid creating a redirect loop on errors
+            return None
         
         return None
     
@@ -154,21 +185,3 @@ def get_current_subscriber(request):
             'name': subscriber_name
         }
     return None
-
-
-def require_subscriber_session(view_func):
-    """
-    Decorator to ensure a view requires subscriber session validation
-    
-    Usage:
-        @require_subscriber_session
-        def my_view(request):
-            # This view will only be accessible if user has validated subscriber
-            pass
-    """
-    def wrapper(request, *args, **kwargs):
-        subscriber_info = get_current_subscriber(request)
-        if not subscriber_info:
-            return redirect('acctmgt:subscriber_selection')
-        return view_func(request, *args, **kwargs)
-    return wrapper

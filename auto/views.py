@@ -28,7 +28,7 @@ from .exceptions import (
     DataValidationError, FileProcessingError, MergeError,
     OutputGenerationError, VerificationError
 )
-from django.db.models import Count, Avg
+from django.db.models import Count, Avg, Q
 from django.utils import timezone
 from .file_archival_utils import save_original_file, delete_original_file
 from datetime import timedelta
@@ -418,25 +418,88 @@ def preprocess_arrears_from_headers(df):
     
     return df_copy
 
+RECOGNIZED_CANONICAL_SHEETS = {
+    'individualborrowertemplate',
+    'corporateborrowertemplate',
+    'creditinformation',
+    'guarantorsinformation',
+    'principalofficerstemplate',
+    'consumermerged',
+    'commercialmerged',
+}
+
+IGNORED_SHEET_KEYWORDS = (
+    'catalogue', 'catalog', 'lookup', 'guide', 'guideline', 'instruction',
+    'code', 'reference', 'readme', 'metadata', 'sample', 'note'
+)
+
+def resolve_sheet_name(sheet_name):
+    """
+    Resolves a sheet name to its canonical bureau template name, or None if unrecognized.
+    Only recognized First Central submission templates are accepted.
+    All auxiliary, catalogue, code lookup, or instruction sheets return None.
+    """
+    if not sheet_name:
+        return None
+
+    raw_lower = str(sheet_name).strip().lower()
+
+    # 1. Immediately reject obvious auxiliary / catalogue / lookup / instruction sheets
+    if any(keyword in raw_lower for keyword in IGNORED_SHEET_KEYWORDS):
+        return None
+
+    # 2. Clean alphanumeric only
+    cleaned = re.sub(r'[^a-zA-Z0-9]', '', raw_lower)
+
+    # 3. Direct normalized match in sheet_name_mappings
+    for k, canonical in sheet_name_mappings.items():
+        k_clean = re.sub(r'[^a-zA-Z0-9]', '', k).lower()
+        if cleaned == k_clean:
+            return canonical
+
+    # 4. Pattern / prefix matching for sheets with extra text (e.g. "Individual_Borrower_Aug2026")
+    if any(k in cleaned for k in ['individualborrower', 'individualtemplate', 'consumerborrower', 'consumertemplate']):
+        return 'individualborrowertemplate'
+    if cleaned.startswith('individual') or cleaned.startswith('consumer'):
+        return 'individualborrowertemplate'
+
+    if any(k in cleaned for k in ['corporateborrower', 'corporatetemplate', 'commercialborrower', 'commercialtemplate']):
+        return 'corporateborrowertemplate'
+    if cleaned.startswith('corporate') or cleaned.startswith('commercial'):
+        return 'corporateborrowertemplate'
+
+    if any(k in cleaned for k in ['principalofficer', 'directorsinformation', 'principalofficers']):
+        return 'principalofficerstemplate'
+
+    if any(k in cleaned for k in ['creditinformation', 'creditinfo', 'loaninformation']):
+        return 'creditinformation'
+    if cleaned.startswith('credit') and ('info' in cleaned or 'loan' in cleaned or cleaned in ('credit', 'credits', 'creditdata')):
+        return 'creditinformation'
+    if cleaned.startswith('loan') and ('info' in cleaned or cleaned in ('loan', 'loans', 'loandata')):
+        return 'creditinformation'
+
+    if any(k in cleaned for k in ['guarantorinformation', 'guarantorsinformation', 'guarantorinfo', 'guarantorsinfo']):
+        return 'guarantorsinformation'
+    if cleaned.startswith('guarantor'):
+        return 'guarantorsinformation'
+
+    if 'consumermerged' in cleaned:
+        return 'consumermerged'
+    if 'commercialmerged' in cleaned:
+        return 'commercialmerged'
+
+    return None
+
+
 def clean_sheet_name(sheet_name):
     """
     Clean sheet names by removing special characters and normalize common variations
-    to canonical sheet type names.
-    
-    This allows users to name their sheets flexibly while still getting
-    proper column mapping and processing applied.
-    
-    Uses sheet_name_mappings from map.py for the normalization.
+    to canonical sheet type names. Returns canonical name or cleaned name.
     """
-    # First, clean the sheet name (remove special chars, lowercase)
-    cleaned_name = re.sub(r'[^a-zA-Z0-9]', '', sheet_name).lower()
-    
-    # Check if cleaned name matches any known variation (from map.py)
-    if cleaned_name in sheet_name_mappings:
-        return sheet_name_mappings[cleaned_name]
-    
-    # If no exact match, return the cleaned name as-is
-    return cleaned_name
+    resolved = resolve_sheet_name(sheet_name)
+    if resolved:
+        return resolved
+    return re.sub(r'[^a-zA-Z0-9]', '', str(sheet_name)).lower()
 
 
 def make_column_names_unique(df):
@@ -461,9 +524,15 @@ def make_column_names_unique(df):
 
 def remove_special_characters(column_name):
     """Remove special characters and all spaces from column names"""
+    column_str = str(column_name)
+    
+    # Remove Excel carriage return escapes and raw line breaks (case-insensitive)
+    cleaned_escapes = re.sub(r'_x[0-9a-fA-F]{4}_', ' ', column_str, flags=re.IGNORECASE)
+    cleaned_escapes = cleaned_escapes.replace('\r', '').replace('\n', '')
+    
     # Remove non-alphanumeric characters but allow spaces
     pattern = r'[^a-zA-Z0-9]'  # Remove special characters
-    cleaned_name = re.sub(pattern, '', column_name)  # Remove special characters
+    cleaned_name = re.sub(pattern, '', cleaned_escapes)  # Remove special characters
     
     # Remove all spaces
     cleaned_name = cleaned_name.replace(' ', '')  # Remove all spaces
@@ -486,20 +555,42 @@ def remove_special_chars(text):
     return cleaned
 
 def remove_titles(name):
-    if not isinstance(name, str):
-        return name
+    """
+    Remove professional, honorific, traditional, and religious titles
+    (e.g., Mr, Mrs, Dr, Alhaji, Alhaja, Hajia, Chief, Pastor, Engr, Barrister, etc. 
+    with or without dots/parentheses) from name strings while preserving actual names.
+    """
+    if not isinstance(name, str) or not name.strip():
+        return ''
     
     titles = [
-        'Miss', 'Mrs', 'Rev', 'Dr', 'Mr', 'MS', 'CAPT','pastor','doctor',
-        'COL', 'LADY', 'MAJ', 'PST', 'PROF', 'REV', 'SGT',
-        'SIR', 'HE', 'JUDG', 'CHF', 'ALHJ', 'APOS', 'CDR', 'ALH', 'Alh',
-        'BISH', 'FLT', 'BARR', 'MGEN', 'GEN', 'HON', 'ENGR', 'LT', 'AND', 'and',
-        'PASTOR', 'PAST', 'PST', 'ALHAJI', 'ALH', 'ALH.', 'ALHAJ', 'ALHADJI', 'ALHAJJI', 'ALHAJ.', 'ALHADJ', 'ALHADJ.',
-        'PASTOR.', 'PASTOR', 'PAST.', 'PST.', 'REV.', 'REV', 'DR.', 'MR.', 'MRS.', 'MS.'
+        # Personal & Gender Titles
+        'MISS', 'MRS', 'REV', 'REVEREND', 'DR', 'DOCTOR', 'DOC', 'MR', 'MS',
+        # Military & Uniformed Titles
+        'CAPT', 'CAPTAIN', 'COL', 'COLONEL', 'MAJ', 'MAJOR', 'SGT', 'SERGEANT',
+        'LT', 'LIEUTENANT', 'CDR', 'COMMANDER', 'FLT', 'FLIGHT', 'ADMIRAL',
+        'GEN', 'GENERAL', 'MGEN', 'MAJOR GENERAL', 'BRIGADIER', 'BRIG',
+        # Religious Titles
+        'PASTOR', 'PAST', 'PST', 'APOSTLE', 'APOS', 'BISHOP', 'BISH', 
+        'EVANGELIST', 'EVANG', 'DEACON', 'DEACONESS', 'ELDER', 'BROTHER', 'SISTER',
+        # Islamic Titles
+        'ALHAJI', 'ALHAJA', 'ALH', 'ALHJ', 'ALHADJI', 'ALHAJJI', 'ALHADJ', 
+        'HAJIA', 'HAJIYA', 'HAJYA',
+        # Traditional & Honorific Titles
+        'CHIEF', 'CHF', 'OTUNBA', 'OBA', 'HRH', 'HRM', 'EMIR',
+        'LADY', 'SIR', 'HE', 'JUDGE', 'JUDG',  'JP', 'HON', 'HONOURABLE', 'HONORABLE',
+        # Professional Titles
+        'PROF', 'PROFESSOR', 'BARR', 'BARRISTER', 'ENGR', 'ENG', 'ENGINEER',
+        'ARCH', 'ARC', 'ARCHITECT', 'SURV', 'SURVEYOR', 'PHARM', 'PHARMACIST'
     ]
     
-    pattern = r'\b(?:' + '|'.join(re.escape(title) for title in titles) + r')\b'
-    cleaned_name = re.sub(pattern, '', name, flags=re.IGNORECASE)
+    # Pre-clean parentheses, slashes, and hyphens around titles e.g. "(DR)" -> "DR", "MR/MRS" -> "MR MRS"
+    text = re.sub(r'[\(\)/\\,-]', ' ', name)
+
+    # Match title at word boundary with optional trailing dot
+    pattern = r'\b(?:' + '|'.join(re.escape(title) for title in titles) + r')\b\.?'
+    cleaned_name = re.sub(pattern, '', text, flags=re.IGNORECASE)
+    
     return ' '.join(cleaned_name.split())
 
 
@@ -1007,7 +1098,7 @@ def remove_special_chars(text):
     return text.strip()
 
 def clean_name_preserving_special_chars(text):
-    """Clean names by replacing hyphens with spaces and removing all other special characters"""
+    """Clean names by replacing '&' with ' And ', hyphens with spaces, and removing all other special characters"""
     if not text:
         return ''
     
@@ -1017,22 +1108,24 @@ def clean_name_preserving_special_chars(text):
     # Remove carriage returns and line feeds
     text = text.replace('\r', '').replace('\n', '')
     
+    # Replace '&' with ' And ' first before special characters are stripped
+    text = text.replace('&', ' And ')
+    
     # First replace hyphens with spaces
-    text = text.replace('-', ' ').replace("'", '')
+    text = text.replace('-', ' ').replace("'", '').replace("`", '')
     
     # Remove all other special characters
-    text = re.sub(r'[^a-zA-Z0-9&]', ' ', text)
+    text = re.sub(r'[^a-zA-Z0-9]', ' ', text)
     
     # Replace multiple spaces with single space and strip
     text = ' '.join(text.split())
     
     return text.strip()
-
+    
 def clean_business_name(df):
     """
-    Clean business name columns by removing purely numeric values.
-    Values like '0', '000', '123', '0.00', '11111' are cleared.
-    Business names should contain letters.
+    Clean business name columns by removing purely numeric values and stripping titles.
+    Values like '0', '000', '123', '0.00' are cleared, and titles (Mr, Mrs, Dr, Chief, etc.) are removed.
     
     Args:
         df: DataFrame to process
@@ -1056,8 +1149,11 @@ def clean_business_name(df):
     
     for col in business_name_columns:
         if col in df.columns:
+            # Clear purely numeric values
             df[col] = df[col].apply(lambda x: '' if is_purely_numeric(x) else x)
-            logger.info(f"Cleaned purely numeric values from column: {col}")
+            # Remove titles from business names (whether splitting or not)
+            df[col] = df[col].apply(lambda x: remove_titles(x) if isinstance(x, str) and x.strip() else x)
+            logger.info(f"Cleaned purely numeric values and titles from column: {col}")
     
     return df
 
@@ -1371,7 +1467,7 @@ def remove_spaces(text):
 
     
 def process_special_characters(df):
-    """Remove special characters from all columns except specified ones, preserving '&' in address columns"""
+    """Remove special characters from all columns except specified ones, replacing '&' with 'And'"""
     if df is None or df.empty:
         return df
     
@@ -1421,31 +1517,6 @@ def process_special_characters(df):
         'CURRENCY',
     ]
 
-    # List of columns that should preserve '&'
-    address_columns = [
-        'PRIMARYADDRESSLINE1',
-        'PRIMARYADDRESSLINE2',
-        'SECONDARYADDRESSLINE1',
-        'SECONDARYADDRESSLINE2',
-        'BUSINESSOFFICEADDRESSLINE1',
-        'BUSINESSOFFICEADDRESSLINE2',
-        'GUARANTORPRIMARYADDRESSLINE1',
-        'GUARANTORPRIMARYADDRESSLINE2',
-        'PRINCIPALOFFICER1PRIMARYADDRESSLINE1',
-        'PRINCIPALOFFICER1PRIMARYADDRESSLINE2',
-        'PRINCIPALOFFICER2PRIMARYADDRESSLINE1',
-        'PRINCIPALOFFICER2PRIMARYADDRESSLINE2',
-        'SECONDARYADDRESSCITYLGA',
-        'BUSINESSOFFICEADDRESSCITYLGA',
-        'GUARANTORPRIMARYADDRESSCITYLGA',
-        'PRINCIPALOFFICER1CITY',
-        'PRINCIPALOFFICER2CITY',
-        'PRIMARYADDRESSCITY',
-        'COLLATERALDETAILS',
-        'BUSINESSNAME',
-        'BUSINESSCATEGORY'
-    ]
-    
     # Account number columns that should preserve '/' and '-'
     account_number_columns = [
         'ACCOUNTNUMBER',
@@ -1460,15 +1531,15 @@ def process_special_characters(df):
         try:
             # Check if the column has any non-null values before processing
             if df[column].notna().any():
+                # Replace '&' with ' And ' first across all columns (before special characters are stripped)
+                df[column] = df[column].apply(lambda x: str(x).replace('&', ' And ') if pd.notnull(x) else x)
+                # Remove single quotes and backticks
+                df[column] = df[column].apply(lambda x: str(x).replace("'", '') if pd.notnull(x) else x)
+                df[column] = df[column].apply(lambda x: str(x).replace("`", '') if pd.notnull(x) else x)
+                
                 if column in account_number_columns:
-                    # Special handling for account numbers - keep '/' and '-'
                     df[column] = df[column].apply(
                         lambda x: re.sub(r'[^a-zA-Z0-9/\-]', '', str(x)) if pd.notnull(x) else x
-                    )
-                elif column in address_columns:
-                    # Keep '&' in address columns
-                    df[column] = df[column].apply(
-                        lambda x: re.sub(r'[^a-zA-Z0-9&]', ' ', str(x)) if pd.notnull(x) else x
                     )
                 else:
                     df[column] = df[column].apply(
@@ -1516,21 +1587,6 @@ def process_special_characters(df):
             except Exception as e:
                 logger.info(f"Error processing email column {col}: {e}")
     
-    return df
-
-def replace_ampersands(df):
-    """
-    Replace all instances of '&' with 'And' across all string columns in the DataFrame
-    """
-    # Remove duplicate columns to avoid DataFrame return from df[column]
-    df = df.loc[:, ~df.columns.duplicated()]
-    for column in df.columns:
-        # Only process object (string) columns
-        if df[column].dtype == 'object':
-            df[column] = df[column].apply(
-                lambda x: str(x).replace('&', ' And ') if pd.notna(x) else x
-            )
-    logger.info("Replaced '&' with 'And' across all string columns")
     return df
 
 def process_passport_number(df):
@@ -2168,24 +2224,24 @@ def map_currency(value):
     for symbol, code in symbol_replacements.items():
         if symbol in value_str:
             value_str = code  # Replace entire value with the code
-            logger.info(f"CURRENCY: '{original_value}' -> symbol '{symbol}' found, replaced with '{code}'")
+            logger.debug(f"CURRENCY: '{original_value}' -> symbol '{symbol}' found, replaced with '{code}'")
             break
     
     # SECOND: Clean and match against Currency_dict
     value_clean = re.sub(r'[^a-zA-Z0-9]', '', value_str.lower())
     
     if not value_clean:
-        logger.info(f"CURRENCY: '{original_value}' -> None (empty after cleaning)")
+        logger.debug(f"CURRENCY: '{original_value}' -> None (empty after cleaning)")
         return None
     
     for category, values in Currency_dict.items():
         # Convert dictionary values to lowercase and remove special characters for comparison
         dict_values = [re.sub(r'[^a-zA-Z0-9]', '', str(v).lower()) for v in values]
         if value_clean in dict_values:
-            logger.info(f"CURRENCY: '{original_value}' -> '{category}' (matched '{value_clean}')")
+            logger.debug(f"CURRENCY: '{original_value}' -> '{category}' (matched '{value_clean}')")
             return category
     
-    logger.info(f"CURRENCY: '{original_value}' -> None (no match for '{value_clean}')")
+    logger.debug(f"CURRENCY: '{original_value}' -> None (no match for '{value_clean}')")
     return None
 
 def process_currency(df):
@@ -2353,7 +2409,7 @@ def convert_tenor_to_days(tenor: Union[str, int, float]) -> Optional[int]:
         - months/m or month
         - years/y or year
     """
-    if tenor is None or tenor == '':
+    if pd.isna(tenor) or tenor is None or tenor == '':
         return None
 
     # If the input is already numeric, return it as integer
@@ -2575,10 +2631,7 @@ def process_collateral_details(df):
             # Remove numeric values
             # text = re.sub(r'\d+', '', text)
             
-            # Remove special characters but preserve spaces and ampersands
-            # text = re.sub(r'[^a-zA-Z\s&]', '', text)
-            
-            # # Remove multiple spaces and strip
+            # Collapse multiple spaces left by digit removal and strip
             text = re.sub(r'\s+', ' ', text).strip()
             
             return text
@@ -3055,9 +3108,30 @@ def remove_duplicates(df, columns_to_check=None):
         logger.info(f"Removed {rows_removed} duplicate rows")
     
     return df_cleaned
+
 # Pre-computed lowercase keyword sets for confidence classification (module-level for performance)
 _COMMERCIAL_KEYWORDS_LOWER = frozenset(k.lower() for k in commercial_keywords)
-_TIER_2_STRONG = _COMMERCIAL_KEYWORDS_LOWER - TIER_1_SUFFIXES - TIER_3_AMBIGUOUS
+_TIER_1_SUFFIXES_LOWER = frozenset(kw.lower() for kw in TIER_1_SUFFIXES)
+_TIER_3_AMBIGUOUS_LOWER = frozenset(kw.lower() for kw in TIER_3_AMBIGUOUS)
+_TIER_2_STRONG = _COMMERCIAL_KEYWORDS_LOWER - _TIER_1_SUFFIXES_LOWER - _TIER_3_AMBIGUOUS_LOWER
+
+# Build unified regexes sorted by length descending to match longer patterns first
+_TIER_1_REGEX = re.compile(
+    r'\b(?:' + '|'.join(re.escape(kw) for kw in sorted(_TIER_1_SUFFIXES_LOWER, key=len, reverse=True)) + r')\b',
+    re.IGNORECASE
+)
+_TIER_2_REGEX = re.compile(
+    r'\b(?:' + '|'.join(re.escape(kw) for kw in sorted(_TIER_2_STRONG, key=len, reverse=True)) + r')\b',
+    re.IGNORECASE
+)
+_TIER_3_REGEX = re.compile(
+    r'\b(?:' + '|'.join(re.escape(kw) for kw in sorted(_TIER_3_AMBIGUOUS_LOWER, key=len, reverse=True)) + r')\b',
+    re.IGNORECASE
+)
+_ANY_COMMERCIAL_REGEX = re.compile(
+    r'\b(?:' + '|'.join(re.escape(kw) for kw in sorted(_TIER_1_SUFFIXES_LOWER | _TIER_2_STRONG | _TIER_3_AMBIGUOUS_LOWER, key=len, reverse=True)) + r')\b',
+    re.IGNORECASE
+)
 
 
 def is_commercial_entity(name, commercial_keywords):
@@ -3085,38 +3159,44 @@ def is_commercial_entity(name, commercial_keywords):
         if keyword in name_words
     ]
     
-    
     return len(commercial_matches) > 0
 
 def classify_commercial_confidence(name):
     """
-    Tiered confidence classifier for commercial entity detection.
-
-    Returns:
-        'auto_commercial' - Last word is a Tier 1 suffix, OR 2+ Tier 1/2 combined matches.
-        'manual_review'   - Exactly 1 Tier 2 match, OR any Tier 3 ambiguous match.
-        None              - No commercial keyword matched (stays in individual).
+    Classification logic for commercial entity detection:
+    - Tier 1 (Legal Suffixes) & Tier 2 (Strong Commercial Keywords) auto-split immediately.
+    - Tier 3 (Ambiguous Keywords) are subject to manual review if 2+ are matched.
+    - Single Tier 3 ambiguous matches stay in Individuals (return None).
     """
     if not isinstance(name, str) or not name.strip():
         return None
 
-    words = name.lower().split()
-    words_set = set(words)
+    name_lower = name.lower()
 
-    tier1_matches = words_set & TIER_1_SUFFIXES
-    tier2_matches = words_set & _TIER_2_STRONG
-    tier3_matches = words_set & TIER_3_AMBIGUOUS
+    # Early exit check: if no commercial keywords are present
+    if not _ANY_COMMERCIAL_REGEX.search(name_lower):
+        return None
 
-    # No commercial keyword at all → stay in individual
+    tier1_matches = {kw for kw in _TIER_1_SUFFIXES_LOWER if re.search(r'\b' + re.escape(kw) + r'\b', name_lower)}
+    tier2_matches = {kw for kw in _TIER_2_STRONG if re.search(r'\b' + re.escape(kw) + r'\b', name_lower)}
+    tier3_matches = {kw for kw in _TIER_3_AMBIGUOUS_LOWER if re.search(r'\b' + re.escape(kw) + r'\b', name_lower)}
+
+    # No commercial keywords matched at all -> Stay in individual
     if not tier1_matches and not tier2_matches and not tier3_matches:
         return None
 
-    # Any Tier 1 or Tier 2 match → unambiguously commercial, auto-move
+    # 1. Any Tier 1 or Tier 2 (strong auto-split) match -> auto-split immediately
     if tier1_matches or tier2_matches:
         return 'auto_commercial'
 
-    # Only Tier 3 ambiguous word(s) matched → manual review
-    return 'manual_review'
+    # 2. Only Tier 3 (ambiguous) matches
+    if tier3_matches:
+        if len(tier3_matches) >= 2:
+            return 'manual_review'
+        else:
+            return None  # Single ambiguous match stays in Individuals
+
+    return None
 
 def split_commercial_entities(indi):
     """
@@ -3190,27 +3270,35 @@ def is_consumer_entity(name, commercial_keywords, threshold=90):
 
 def classify_consumer_confidence(name):
     """
-    Tiered confidence classifier for consumer entity detection.
-
-    Returns:
-        'auto_consumer'  - Zero commercial keyword matches → clearly a personal name.
-        'manual_review'  - ONLY Tier 3 ambiguous keyword(s) matched → needs human check.
-        None             - A Tier 1 or Tier 2 keyword matched → stays in corporate.
+    Consumer entity detection in corporate business names.
+    If a corporate record contains ANY Tier 1 or Tier 2 commercial keyword, it remains in corporate.
+    If it contains only Tier 3 ambiguous keywords, it goes to manual review.
+    Otherwise, if it contains no commercial keywords at all, it auto-moves to individual.
     """
     if not isinstance(name, str) or not name.strip():
         return None
 
-    words_set = set(name.lower().split())
+    name_lower = name.lower()
 
-    if words_set & TIER_1_SUFFIXES:
-        return None
-    if words_set & _TIER_2_STRONG:
+    # 1. Early exit: if no commercial keywords are present, it's auto_consumer
+    if not _ANY_COMMERCIAL_REGEX.search(name_lower):
+        return 'auto_consumer'
+
+    # Regex search for keyword matches (handling spaced phrases)
+    # Using lowercased keyword sets to resolve case-sensitivity matching bugs
+    tier1_matches = {kw for kw in _TIER_1_SUFFIXES_LOWER if re.search(r'\b' + re.escape(kw) + r'\b', name_lower)}
+    tier2_matches = {kw for kw in _TIER_2_STRONG if re.search(r'\b' + re.escape(kw) + r'\b', name_lower)}
+    tier3_matches = {kw for kw in _TIER_3_AMBIGUOUS_LOWER if re.search(r'\b' + re.escape(kw) + r'\b', name_lower)}
+
+    # 1. Any Tier 1 or Tier 2 keyword match -> Strictly remains in corporate (returns None)
+    if tier1_matches or tier2_matches:
         return None
 
-    tier3_matches = words_set & TIER_3_AMBIGUOUS
+    # 2. Only Tier 3 ambiguous matches -> Manual review
     if tier3_matches:
         return 'manual_review'
 
+    # 3. Zero commercial keywords -> Auto-move to individual
     return 'auto_consumer'
 
 def split_consumer_entities(corpo):
@@ -3253,10 +3341,16 @@ def split_consumer_entities(corpo):
 
         try:
             doi_str = str(doi_value).strip()
-            parsed_doi = dateparser.parse(doi_str)
-            if parsed_doi is None:
-                continue  # Unparseable date — keep as commercial
-            years_since_incorporation = datetime.now().year - parsed_doi.year
+            # Fast-path for standardized YYYYMMDD date format strings
+            if len(doi_str) == 8 and doi_str.isdigit():
+                doi_year = int(doi_str[:4])
+            else:
+                parsed_doi = dateparser.parse(doi_str)
+                if parsed_doi is None:
+                    continue  # Unparseable date — keep as commercial
+                doi_year = parsed_doi.year
+            
+            years_since_incorporation = datetime.now().year - doi_year
             if years_since_incorporation < 18:
                 continue  # Recently incorporated — keep as commercial
         except Exception:
@@ -3293,12 +3387,13 @@ def split_consumer_entities(corpo):
 
     return corpo, _to_df(auto_consumer_rows), _to_df(manual_review_rows)
 
-def merge_dataframes(processed_sheets):
+def merge_dataframes(processed_sheets, split_option='split'):
     """
     Main merging function with sequential processing
     
     Args:
         processed_sheets (dict): Dictionary of processed DataFrames
+        split_option (str): 'split' or 'no_split'
     
     Returns:
         tuple: (Individual borrowers DataFrame, Corporate borrowers DataFrame)
@@ -3319,6 +3414,10 @@ def merge_dataframes(processed_sheets):
         logger.info("\n=== MERGED SHEET DATA (Before Split) ===")
         logger.info("Individual records:", len(indi))
         logger.info("Corporate records:", len(corpo))
+
+        if split_option == 'no_split':
+            logger.info("[SPLIT CHOICE] User selected 'no_split' - skipping entity splitting for merged sheets")
+            return indi, corpo
 
         # --- Added Processing for Merged Sheets ---
         # Split commercial entities from the consumer_merged data
@@ -3780,9 +3879,14 @@ def upload_file(request):
                 combined_filename = combined_filename[:252] + '...'
             total_size = sum(f.size for f in uploaded_files)
             
-            # Capture user-selected reporting period
+            # Capture user-selected reporting period, split_option, and file_password
             selected_month = int(form.cleaned_data['month'])
             selected_year = int(form.cleaned_data['year'])
+            split_option = form.cleaned_data.get('split_option', 'split') or 'split'
+            file_password = form.cleaned_data.get('file_password', '') or None
+
+            # Purge any leftover verification candidates or session data from previous/abandoned uploads
+            clear_verification_session(request)
             
             # Get subscriber information based on user type
             from acctmgt.models import UserProfile
@@ -3813,18 +3917,50 @@ def upload_file(request):
                 user_profile = UserProfile.get_or_create_profile(request.user)
                 
                 # Ensure user is bound to a subscriber
-                if not user_profile.is_bound:
-                    messages.error(request, 'Your account is not bound to any organization. Please complete the binding process.')
-                    return redirect('acctmgt:subscriber_selection')
+                if not user_profile or not user_profile.is_bound:
+                    messages.error(request, 'Your account is not assigned to an active organization. Please contact First Central Administrator.')
+                    return redirect('acctmgt:login')
                 
                 # Get bound subscriber information
                 bound_subscriber = user_profile.get_bound_subscriber()
                 if not bound_subscriber:
-                    messages.error(request, 'Unable to retrieve your organization information. Please contact support.')
-                    return redirect('acctmgt:subscriber_selection')
+                    messages.error(request, 'Unable to retrieve your organization information. Please contact First Central Administrator.')
+                    return redirect('acctmgt:login')
                 
                 subscriber_id = bound_subscriber.subscriber_id
                 subscriber_name = bound_subscriber.subscriber_name
+
+                # 1. Enforce strict monthly quota: 1 completed upload per reporting period per organization
+                completed_session = UploadSession.objects.filter(
+                    subscriber_id=subscriber_id,
+                    reporting_month=selected_month,
+                    reporting_year=selected_year,
+                    status='completed'
+                ).order_by('-completed_at').first()
+
+                if completed_session:
+                    month_name = calendar.month_name[selected_month]
+                    messages.error(
+                        request,
+                        f"Upload blocked: Your organization ({subscriber_name}) has already successfully completed processing for {month_name} {selected_year}. "
+                        f"If you need to submit a corrected file, please click the Feedback button on the bottom right to request an admin unlock."
+                    )
+                    return redirect('auto:upload')
+
+                # 2. Prevent concurrent duplicate uploads if one is currently in progress for this reporting period
+                in_flight = UploadSession.objects.filter(
+                    subscriber_id=subscriber_id,
+                    reporting_month=selected_month,
+                    reporting_year=selected_year,
+                    status__in=['uploading', 'processing', 'awaiting_verification', 'finalizing']
+                ).first()
+
+                if in_flight:
+                    messages.warning(
+                        request,
+                        f"A file is currently being processed for your organization for this reporting period. Please wait for it to complete or check progress before uploading another file."
+                    )
+                    return redirect('auto:progress_tracking', session_id=in_flight.id)
             
             # Save original files for archival purposes before any processing
             upload_timestamp = timezone.now()
@@ -3865,13 +4001,15 @@ def upload_file(request):
                 status='uploading',
                 original_file_path=','.join(original_file_paths),  # Store all paths
                 reporting_month=selected_month,
-                reporting_year=selected_year
+                reporting_year=selected_year,
+                split_option=split_option,
+                file_password=file_password
             )
             
-            # Show confirmation message with selected reporting period
+            # Log confirmation with selected reporting period
             month_name = calendar.month_name[selected_month]
             file_count_msg = f"Processing {len(uploaded_files)} file(s)" if len(uploaded_files) > 1 else "Processing file"
-            messages.info(request, f'{file_count_msg} for reporting period: {month_name} {selected_year}')
+            logger.info(f"[UPLOAD] {file_count_msg} for reporting period: {month_name} {selected_year}")
             
             # Queue async processing task
             try:
@@ -3887,6 +4025,8 @@ def upload_file(request):
                     request.user.id,
                     selected_month,  # Pass reporting month to task
                     selected_year,   # Pass reporting year to task
+                    split_option,    # Pass split_option ('split' or 'no_split')
+                    file_password,   # Pass file password
                     task_name=f'process_file_{upload_session.id}'
                 )
                 
@@ -3924,12 +4064,42 @@ def upload_file(request):
         else:
             # Regular user: show bound subscriber info
             user_profile = UserProfile.get_or_create_profile(request.user)
-            if user_profile.is_bound:
+            if user_profile and user_profile.is_bound:
                 bound_subscriber = user_profile.get_bound_subscriber()
                 if bound_subscriber:
                     context['bound_subscriber'] = bound_subscriber
                     context['subscriber_name'] = bound_subscriber.subscriber_name
                     context['subscriber_id'] = bound_subscriber.subscriber_id
+
+                    # Check active in-flight session
+                    in_flight_session = UploadSession.objects.filter(
+                        subscriber_id=bound_subscriber.subscriber_id,
+                        status__in=['uploading', 'processing', 'awaiting_verification', 'finalizing']
+                    ).order_by('-uploaded_at').first()
+                    context['in_flight_session'] = in_flight_session
+
+                    # Check default month and year for initial lock status
+                    initial_month = form.initial.get('month') or form['month'].value()
+                    initial_year = form.initial.get('year') or form['year'].value()
+                    try:
+                        init_m = int(initial_month)
+                        init_y = int(initial_year)
+                    except (TypeError, ValueError):
+                        init_m = timezone.now().month
+                        init_y = timezone.now().year
+
+                    import calendar
+                    locked_session = UploadSession.objects.filter(
+                        subscriber_id=bound_subscriber.subscriber_id,
+                        reporting_month=init_m,
+                        reporting_year=init_y,
+                        status='completed'
+                    ).order_by('-completed_at').first()
+
+                    context['is_quota_locked'] = bool(locked_session)
+                    context['locked_session'] = locked_session
+                    context['locked_month_name'] = calendar.month_name[init_m]
+                    context['locked_year'] = init_y
         
         # Always check for last completed upload session
         last_upload = UploadSession.objects.filter(
@@ -4177,6 +4347,24 @@ def transform_to_consumer(df, columns_to_clear):
 # 
 
 
+def clear_verification_session(request):
+    """
+    Purge all verification candidates and session keys from request.session.
+    Ensures no state leakage across upload sessions or after cancellations.
+    """
+    verification_keys = [
+        'upload_session_id', 'commercial_candidates', 'consumer_candidates',
+        'columns_commercial', 'columns_consumer', 'split_candidates_commercial',
+        'split_candidates_consumer', 'processing_stats', 'original_filename',
+        'using_parquet', 'split_indi', 'split_corpo', 'indi', 'corpo',
+        'consumer_data', 'commercial_data', 'individual_credit_merged',
+        'corporate_credit_merged', 'individual_credit_unmerged',
+        'corporate_credit_unmerged', 'subscriber_id', 'subscriber_name'
+    ]
+    for key in verification_keys:
+        request.session.pop(key, None)
+    request.session.modified = True
+
 
 @login_required
 @csrf_exempt
@@ -4187,7 +4375,17 @@ def verify_split_decision(request):
     if request.method == 'GET' and 'session_id' in request.GET:
         try:
             session_id = int(request.GET['session_id'])
-            upload_session = UploadSessionModel.objects.get(id=session_id, user=request.user)
+            if request.user.is_staff or request.user.is_superuser:
+                upload_session = UploadSessionModel.objects.get(id=session_id)
+            else:
+                from acctmgt.models import UserProfile
+                profile = UserProfile.get_or_create_profile(request.user)
+                bound_sub_id = profile.bound_subscriber_id if (profile and profile.is_bound) else None
+                upload_session = UploadSessionModel.objects.filter(id=session_id).filter(
+                    Q(user=request.user) | (Q(subscriber_id=bound_sub_id) if bound_sub_id else Q(user=request.user))
+                ).first()
+                if not upload_session:
+                    raise UploadSessionModel.DoesNotExist
             
             # Load processing data from UploadSession
             if upload_session.processing_data:
@@ -4284,7 +4482,17 @@ def verify_split_decision(request):
             
             # Get the upload session
             from .models import UploadSession as UploadSessionModel
-            upload_session = UploadSessionModel.objects.get(id=upload_session_id, user=request.user)
+            if request.user.is_staff or request.user.is_superuser:
+                upload_session = UploadSessionModel.objects.get(id=upload_session_id)
+            else:
+                from acctmgt.models import UserProfile
+                profile = UserProfile.get_or_create_profile(request.user)
+                bound_sub_id = profile.bound_subscriber_id if (profile and profile.is_bound) else None
+                upload_session = UploadSessionModel.objects.filter(id=upload_session_id).filter(
+                    Q(user=request.user) | (Q(subscriber_id=bound_sub_id) if bound_sub_id else Q(user=request.user))
+                ).first()
+                if not upload_session:
+                    raise UploadSessionModel.DoesNotExist
             
             # Store verification decisions in processing_data for async processing
             processing_data = json.loads(upload_session.processing_data or '{}')
@@ -4327,19 +4535,7 @@ def verify_split_decision(request):
             logger.info(f"[VERIFICATION] Post-verification task queued with ID: {task_id}")
             
             # Clean up session verification data
-            request.session.pop('commercial_candidates', None)
-            request.session.pop('consumer_candidates', None)
-            request.session.pop('columns_commercial', None)
-            request.session.pop('columns_consumer', None)
-            request.session.pop('consumer_data', None)
-            request.session.pop('commercial_data', None)
-            request.session.pop('processing_stats', None)
-            request.session.pop('individual_credit_merged', None)
-            request.session.pop('corporate_credit_merged', None)
-            request.session.pop('individual_credit_unmerged', None)
-            request.session.pop('corporate_credit_unmerged', None)
-            request.session.pop('split_candidates_commercial', None)
-            request.session.pop('split_candidates_consumer', None)
+            clear_verification_session(request)
             
             # Redirect to progress tracking page immediately
             return redirect('auto:progress_tracking', session_id=upload_session_id)
@@ -4369,61 +4565,321 @@ def clean_and_deduplicate_columns(df):
     df.columns = new_cols
     return df
 
+def _render_admin_dashboard(request, user_profile):
+    """
+    Renders the dedicated Bureau Subscriber Completion Tracker for Admin/Staff.
+    Shows only financial institutions that have completed monthly data submissions.
+    """
+    from .models import UploadSession, Subscriber
+    import calendar
+
+    # 1. Base queryset: Strictly completed sessions only
+    completed_qs = UploadSession.objects.filter(status='completed').select_related('user')
+
+    # 2. Discover available reporting periods from completed submissions
+    # Ordered by reporting_year desc, reporting_month desc
+    periods_raw = completed_qs.exclude(reporting_month__isnull=True).exclude(reporting_year__isnull=True)\
+        .values_list('reporting_year', 'reporting_month').distinct().order_by('-reporting_year', '-reporting_month')
+
+    available_periods = []
+    for y, m in periods_raw:
+        try:
+            m_name = calendar.month_name[m]
+        except Exception:
+            m_name = f"Month {m}"
+        available_periods.append({
+            'value': f"{m}_{y}",
+            'label': f"{m_name} {y}",
+            'month': m,
+            'year': y
+        })
+
+    # 3. Determine selected period from request.GET
+    requested_period = request.GET.get('period', '').strip()
+
+    selected_period = None
+    selected_period_label = "All Periods"
+
+    if requested_period == 'all':
+        selected_period = 'all'
+        filtered_qs = completed_qs
+    elif requested_period:
+        try:
+            m_str, y_str = requested_period.split('_')
+            sel_m, sel_y = int(m_str), int(y_str)
+            filtered_qs = completed_qs.filter(reporting_month=sel_m, reporting_year=sel_y)
+            selected_period = requested_period
+            selected_period_label = f"{calendar.month_name[sel_m]} {sel_y}"
+        except Exception:
+            requested_period = ''
+
+    if not requested_period:
+        # Default behavior:
+        # If available_periods exists, default to the latest period
+        if available_periods:
+            latest_p = available_periods[0]
+            selected_period = latest_p['value']
+            selected_period_label = latest_p['label']
+            filtered_qs = completed_qs.filter(reporting_month=latest_p['month'], reporting_year=latest_p['year'])
+        else:
+            selected_period = 'all'
+            filtered_qs = completed_qs
+
+    # 4. Order filtered queryset by completed_at desc
+    filtered_qs = filtered_qs.order_by('-completed_at')
+
+    # 5. Fast subscriber name lookup map to avoid N+1 queries
+    try:
+        subscribers_map = {s.subscriber_id: s.subscriber_name for s in Subscriber.objects.all()}
+    except Exception:
+        subscribers_map = {}
+
+    completed_list = []
+    for s in filtered_qs:
+        sub_name = subscribers_map.get(s.subscriber_id) or (s.get_subscriber_name() if hasattr(s, 'get_subscriber_name') else f"ID: {s.subscriber_id}")
+
+        if s.reporting_month and s.reporting_year:
+            try:
+                p_display = f"{calendar.month_name[s.reporting_month]} {s.reporting_year}"
+            except Exception:
+                p_display = f"{s.reporting_month}/{s.reporting_year}"
+        elif s.completed_at:
+            p_display = s.completed_at.strftime('%B %Y')
+        else:
+            p_display = "N/A"
+
+        uploader_name = s.user.username if s.user else "System"
+
+        completed_list.append({
+            'subscriber_name': sub_name,
+            'subscriber_id': s.subscriber_id,
+            'period_display': p_display,
+            'completed_at': s.completed_at or s.uploaded_at,
+            'total_records': s.total_records or 0,
+            'individual_records': s.individual_records or 0,
+            'corporate_records': s.corporate_records or 0,
+            'uploader': uploader_name,
+            'session': s,
+        })
+
+    # 6. KPI metrics
+    unique_subscribers_count = len(set(item['subscriber_id'] for item in completed_list))
+    total_records_sum = sum(item['total_records'] for item in completed_list)
+    latest_completion = completed_list[0]['completed_at'] if completed_list else None
+
+    admin_context = {
+        'user_profile': user_profile,
+        'available_periods': available_periods,
+        'selected_period': selected_period,
+        'selected_period_label': selected_period_label,
+        'total_completed_count': unique_subscribers_count,
+        'total_records_sum': f"{total_records_sum:,}",
+        'latest_completion': latest_completion,
+        'completed_list': completed_list,
+    }
+
+    return render(request, 'admin_dashboard.html', admin_context)
+
 
 @login_required
 def dashboard(request):
     """
-    Main dashboard view displaying upload statistics and user engagement metrics
+    Main dashboard view displaying monthly filing compliance, portfolio metrics,
+    data quality rates, and the official Monthly Submission Ledger.
     """
     from .models import UploadSession, SubscriberUtils
     from acctmgt.models import UserProfile
     from django.utils import timezone
-    from datetime import timedelta
+    import calendar
     
     # Get user profile and subscriber information
     user_profile = UserProfile.get_or_create_profile(request.user)
     
-    # Check if user is multi-subscriber (they don't need binding)
+    # Check if user is staff/superuser or multi-subscriber (they don't need binding)
     is_multi_subscriber = request.user.groups.filter(name='multi_subscriber').exists()
+    is_admin = request.user.is_staff or request.user.is_superuser
+    
+    if is_admin:
+        return _render_admin_dashboard(request, user_profile)
     
     if is_multi_subscriber:
-        # Multi-subscriber users can view dashboard without specific binding
         bound_subscriber = None
+        base_qs = UploadSession.objects.filter(user=request.user)
     else:
         # Regular users must be bound to a subscriber
-        if not user_profile.is_bound:
-            messages.error(request, 'Your account is not bound to any organization. Please complete the binding process.')
-            return redirect('acctmgt:subscriber_selection')
+        if not user_profile or not user_profile.is_bound:
+            messages.error(request, 'Your account has not yet been assigned to an organization. Please contact First Central Administrator.')
+            return redirect('acctmgt:login')
         
         bound_subscriber = user_profile.get_bound_subscriber()
         if not bound_subscriber:
-            messages.error(request, 'Unable to retrieve your organization information. Please contact support.')
-            return redirect('acctmgt:subscriber_selection')
+            messages.error(request, 'Unable to retrieve your organization information. Please contact First Central Administrator.')
+            return redirect('acctmgt:login')
+        base_qs = UploadSession.objects.filter(subscriber_id=bound_subscriber.subscriber_id)
     
-    # Calculate date ranges
-    today = timezone.now().date()
-    week_start = today - timedelta(days=today.weekday())
-    month_start = today.replace(day=1)
+    # Credit bureau reporting is in arrears: data for the previous month (M-1) is submitted in the current month (M)
+    now = timezone.now()
+    current_month = now.month
+    current_year = now.year
     
-    # Get upload statistics
-    today_stats = UploadSession.get_user_stats(request.user, days=1)
-    weekly_stats = UploadSession.get_user_stats(request.user, days=7)
-    monthly_stats = UploadSession.get_user_stats(request.user, days=30)
-    overall_stats = UploadSession.get_user_stats(request.user)
+    if current_month == 1:
+        reporting_cycle_month = 12
+        reporting_cycle_year = current_year - 1
+    else:
+        reporting_cycle_month = current_month - 1
+        reporting_cycle_year = current_year
+        
+    reporting_cycle_month_name = calendar.month_name[reporting_cycle_month]
+    cycle_label = f"{reporting_cycle_month_name} {reporting_cycle_year}"
     
-    # Get recent uploads
-    recent_uploads = UploadSession.get_recent_uploads(request.user, limit=10)
+    # 1. Target Cycle Session & Filing Status (evaluating the N-1 closed reporting month)
+    current_cycle_session = base_qs.filter(
+        reporting_month=reporting_cycle_month,
+        reporting_year=reporting_cycle_year
+    ).order_by('-uploaded_at').first()
     
-    # Prepare context data
+    in_flight_session = base_qs.filter(
+        status__in=['uploading', 'processing', 'awaiting_verification', 'finalizing']
+    ).order_by('-uploaded_at').first()
+    
+    latest_completed = base_qs.filter(status='completed').order_by('-completed_at').first()
+    
+    if current_cycle_session:
+        if current_cycle_session.status == 'completed':
+            filing_status = {
+                'code': 'completed',
+                'display': 'COMPLETED',
+                'color': 'success',
+                'cycle': cycle_label,
+                'subtext': f"Submitted on {current_cycle_session.completed_at.strftime('%b %d, %Y')} by {current_cycle_session.user.username}",
+                'session': current_cycle_session
+            }
+        elif current_cycle_session.status in ['processing', 'uploading', 'awaiting_verification', 'finalizing']:
+            filing_status = {
+                'code': 'processing',
+                'display': 'IN PROGRESS',
+                'color': 'primary',
+                'cycle': cycle_label,
+                'subtext': 'Processing / Verification in progress',
+                'session': current_cycle_session
+            }
+        elif current_cycle_session.status == 'invalidated':
+            filing_status = {
+                'code': 'invalidated',
+                'display': 'RE-UPLOAD ALLOWED',
+                'color': 'warning',
+                'cycle': cycle_label,
+                'subtext': 'Session unlocked by admin. Ready for revised upload',
+                'session': current_cycle_session
+            }
+        else:
+            filing_status = {
+                'code': current_cycle_session.status,
+                'display': current_cycle_session.get_status_display().upper(),
+                'color': 'danger',
+                'cycle': cycle_label,
+                'subtext': 'Action required for this cycle',
+                'session': current_cycle_session
+            }
+    elif in_flight_session:
+        in_flight_label = f"{calendar.month_name[in_flight_session.reporting_month]} {in_flight_session.reporting_year}" if (in_flight_session.reporting_month and in_flight_session.reporting_year) else cycle_label
+        filing_status = {
+            'code': 'processing',
+            'display': 'PROCESSING',
+            'color': 'primary',
+            'cycle': in_flight_label,
+            'subtext': 'Upload in progress',
+            'session': in_flight_session
+        }
+    else:
+        filing_status = {
+            'code': 'pending',
+            'display': 'PENDING SUBMISSION',
+            'color': 'warning',
+            'cycle': cycle_label,
+            'subtext': 'Submission required for this cycle',
+            'session': None
+        }
+    
+    # 2. Portfolio Volume (from latest completed submission)
+    if latest_completed:
+        if latest_completed.reporting_month and latest_completed.reporting_year:
+            period_lbl = f"{calendar.month_name[latest_completed.reporting_month]} {latest_completed.reporting_year}"
+        else:
+            period_lbl = latest_completed.uploaded_at.strftime('%B %Y')
+            
+        portfolio_volume = {
+            'total_records': latest_completed.total_records,
+            'individual_records': latest_completed.individual_records,
+            'corporate_records': latest_completed.corporate_records,
+            'period_label': period_lbl,
+        }
+    else:
+        portfolio_volume = {
+            'total_records': 0,
+            'individual_records': 0,
+            'corporate_records': 0,
+            'period_label': 'No Submissions Yet',
+        }
+    
+    # 3. Data Quality & Acceptance (from latest completed submission)
+    if latest_completed and latest_completed.total_records > 0:
+        total_rec = latest_completed.total_records
+        total_excl = (latest_completed.excluded_individual_records or 0) + (latest_completed.excluded_corporate_records or 0)
+        unmatched_cnt = latest_completed.unmatched_credit_records or 0
+        clean_pct = max(0.0, min(100.0, ((total_rec - total_excl) / total_rec) * 100.0))
+        
+        data_quality = {
+            'clean_rate': clean_pct,
+            'excluded_records': total_excl,
+            'unmatched_records': unmatched_cnt,
+            'has_exclusions': total_excl > 0 or unmatched_cnt > 0,
+            'subtext': f"{total_excl} Excluded · {unmatched_cnt} Unmatched" if (total_excl > 0 or unmatched_cnt > 0) else "100% Clean Records · 0 Excluded"
+        }
+    else:
+        data_quality = {
+            'clean_rate': 100.0 if latest_completed else 0.0,
+            'excluded_records': 0,
+            'unmatched_records': 0,
+            'has_exclusions': False,
+            'subtext': '100% Clean Records' if latest_completed else 'Awaiting first batch'
+        }
+    
+    # 4. Monthly Submission Ledger & Audit Archive
+    ledger_sessions = base_qs.order_by('-uploaded_at')[:24]
+    monthly_ledger = []
+    for s in ledger_sessions:
+        if s.reporting_month and s.reporting_year:
+            try:
+                period_str = f"{calendar.month_name[s.reporting_month]} {s.reporting_year}"
+            except Exception:
+                period_str = f"{s.reporting_month}/{s.reporting_year}"
+        else:
+            period_str = s.uploaded_at.strftime('%B %Y')
+            
+        excl_total = (s.excluded_individual_records or 0) + (s.excluded_corporate_records or 0)
+        if s.total_records > 0:
+            c_rate = max(0.0, min(100.0, ((s.total_records - excl_total) / s.total_records) * 100.0))
+        else:
+            c_rate = 100.0 if s.status == 'completed' else None
+            
+        monthly_ledger.append({
+            'session': s,
+            'period_display': period_str,
+            'total_excluded': excl_total,
+            'clean_rate': c_rate,
+        })
+    
     context = {
         'user_profile': user_profile,
         'subscriber': bound_subscriber,
-        'today_stats': today_stats,
-        'weekly_stats': weekly_stats,
-        'monthly_stats': monthly_stats,
-        'overall_stats': overall_stats,
-        'recent_uploads': recent_uploads,
-        'current_date': today,
+        'filing_status': filing_status,
+        'portfolio_volume': portfolio_volume,
+        'data_quality': data_quality,
+        'monthly_ledger': monthly_ledger,
+        'current_date': now.date(),
+        'current_month_name': reporting_cycle_month_name,
+        'current_year': reporting_cycle_year,
     }
     
     return render(request, 'dashboard.html', context)
@@ -4433,44 +4889,162 @@ def dashboard(request):
 @csrf_exempt
 def dashboard_api(request):
     """
-    API endpoint for real-time dashboard data updates
+    API endpoint for real-time dashboard data updates: 3 monthly metrics and ledger
     """
     from .models import UploadSession
+    from acctmgt.models import UserProfile
     from django.utils import timezone
+    import calendar
     
     if request.method == 'GET':
-        # Get time range from query parameters
-        time_range = request.GET.get('range', 'today')
+        user_profile = UserProfile.get_or_create_profile(request.user)
+        is_multi_subscriber = request.user.groups.filter(name='multi_subscriber').exists()
+        is_admin = request.user.is_staff or request.user.is_superuser
         
-        if time_range == 'today':
-            stats = UploadSession.get_user_stats(request.user, days=1)
-        elif time_range == 'week':
-            stats = UploadSession.get_user_stats(request.user, days=7)
-        elif time_range == 'month':
-            stats = UploadSession.get_user_stats(request.user, days=30)
+        if is_admin or is_multi_subscriber:
+            base_qs = UploadSession.objects.all() if is_admin else UploadSession.objects.filter(user=request.user)
         else:
-            stats = UploadSession.get_user_stats(request.user)
+            bound_subscriber = user_profile.get_bound_subscriber() if (user_profile and user_profile.is_bound) else None
+            if bound_subscriber:
+                base_qs = UploadSession.objects.filter(subscriber_id=bound_subscriber.subscriber_id)
+            else:
+                base_qs = UploadSession.objects.filter(user=request.user)
         
-        # Get recent uploads
-        recent_uploads = UploadSession.get_recent_uploads(request.user, limit=10)
+        # Credit bureau reporting is in arrears: data for previous month (M-1) is submitted in current month (M)
+        now = timezone.now()
+        current_month = now.month
+        current_year = now.year
         
-        # Format recent uploads for JSON response
-        uploads_data = []
-        for upload in recent_uploads:
-            uploads_data.append({
-                'id': upload.id,
-                'filename': upload.original_filename,
-                'status': upload.status,
-                'uploaded_at': upload.uploaded_at.isoformat(),
-                'total_records': upload.total_records,
-                'individual_records': upload.individual_records,
-                'corporate_records': upload.corporate_records,
-                'processing_time': upload.processing_time,
+        if current_month == 1:
+            reporting_cycle_month = 12
+            reporting_cycle_year = current_year - 1
+        else:
+            reporting_cycle_month = current_month - 1
+            reporting_cycle_year = current_year
+            
+        reporting_cycle_month_name = calendar.month_name[reporting_cycle_month]
+        cycle_label = f"{reporting_cycle_month_name} {reporting_cycle_year}"
+        
+        current_cycle_session = base_qs.filter(
+            reporting_month=reporting_cycle_month,
+            reporting_year=reporting_cycle_year
+        ).order_by('-uploaded_at').first()
+        
+        in_flight_session = base_qs.filter(
+            status__in=['uploading', 'processing', 'awaiting_verification', 'finalizing']
+        ).order_by('-uploaded_at').first()
+        
+        latest_completed = base_qs.filter(status='completed').order_by('-completed_at').first()
+        
+        if current_cycle_session:
+            if current_cycle_session.status == 'completed':
+                status_data = {
+                    'code': 'completed',
+                    'display': 'COMPLETED',
+                    'color': 'success',
+                    'cycle': cycle_label,
+                    'subtext': f"Submitted on {current_cycle_session.completed_at.strftime('%b %d, %Y')}"
+                }
+            elif current_cycle_session.status in ['processing', 'uploading', 'awaiting_verification', 'finalizing']:
+                status_data = {
+                    'code': 'processing',
+                    'display': 'IN PROGRESS',
+                    'color': 'primary',
+                    'cycle': cycle_label,
+                    'subtext': 'Processing in progress'
+                }
+            elif current_cycle_session.status == 'invalidated':
+                status_data = {
+                    'code': 'invalidated',
+                    'display': 'RE-UPLOAD ALLOWED',
+                    'color': 'warning',
+                    'cycle': cycle_label,
+                    'subtext': 'Session unlocked for revised upload'
+                }
+            else:
+                status_data = {
+                    'code': current_cycle_session.status,
+                    'display': current_cycle_session.get_status_display().upper(),
+                    'color': 'danger',
+                    'cycle': cycle_label,
+                    'subtext': 'Action required'
+                }
+        elif in_flight_session:
+            in_flight_label = f"{calendar.month_name[in_flight_session.reporting_month]} {in_flight_session.reporting_year}" if (in_flight_session.reporting_month and in_flight_session.reporting_year) else cycle_label
+            status_data = {
+                'code': 'processing',
+                'display': 'PROCESSING',
+                'color': 'primary',
+                'cycle': in_flight_label,
+                'subtext': 'Upload in progress'
+            }
+        else:
+            status_data = {
+                'code': 'pending',
+                'display': 'PENDING SUBMISSION',
+                'color': 'warning',
+                'cycle': cycle_label,
+                'subtext': 'Submission required for this cycle'
+            }
+            
+        if latest_completed:
+            period_lbl = f"{calendar.month_name[latest_completed.reporting_month]} {latest_completed.reporting_year}" if (latest_completed.reporting_month and latest_completed.reporting_year) else latest_completed.uploaded_at.strftime('%B %Y')
+            volume_data = {
+                'total_records': latest_completed.total_records,
+                'individual_records': latest_completed.individual_records,
+                'corporate_records': latest_completed.corporate_records,
+                'period_label': period_lbl,
+            }
+            total_rec = latest_completed.total_records
+            total_excl = (latest_completed.excluded_individual_records or 0) + (latest_completed.excluded_corporate_records or 0)
+            unmatched_cnt = latest_completed.unmatched_credit_records or 0
+            clean_pct = max(0.0, min(100.0, ((total_rec - total_excl) / total_rec) * 100.0)) if total_rec > 0 else 100.0
+            quality_data = {
+                'clean_rate': round(clean_pct, 1),
+                'excluded_records': total_excl,
+                'unmatched_records': unmatched_cnt,
+                'subtext': f"{total_excl} Excluded · {unmatched_cnt} Unmatched" if (total_excl > 0 or unmatched_cnt > 0) else "100% Clean Records"
+            }
+        else:
+            volume_data = {
+                'total_records': 0,
+                'individual_records': 0,
+                'corporate_records': 0,
+                'period_label': 'No Submissions Yet',
+            }
+            quality_data = {
+                'clean_rate': 0.0,
+                'excluded_records': 0,
+                'unmatched_records': 0,
+                'subtext': 'Awaiting first batch'
+            }
+            
+        ledger_sessions = base_qs.order_by('-uploaded_at')[:24]
+        ledger_data = []
+        for s in ledger_sessions:
+            period_str = f"{calendar.month_name[s.reporting_month]} {s.reporting_year}" if (s.reporting_month and s.reporting_year) else s.uploaded_at.strftime('%B %Y')
+            excl_total = (s.excluded_individual_records or 0) + (s.excluded_corporate_records or 0)
+            ledger_data.append({
+                'id': s.id,
+                'filename': s.original_filename,
+                'status': s.status,
+                'status_display': s.get_status_display(),
+                'period_display': period_str,
+                'uploaded_at': s.uploaded_at.strftime('%b %d, %Y %H:%M'),
+                'uploader': s.user.username if s.user else 'System',
+                'total_records': s.total_records,
+                'individual_records': s.individual_records,
+                'corporate_records': s.corporate_records,
+                'excluded_records': excl_total,
+                'unmatched_records': s.unmatched_credit_records or 0,
+                'processing_time': s.processing_time,
             })
-        
+            
         return JsonResponse({
-            'stats': stats,
-            'recent_uploads': uploads_data,
+            'status_metric': status_data,
+            'volume_metric': volume_data,
+            'quality_metric': quality_data,
+            'ledger': ledger_data,
             'timestamp': timezone.now().isoformat()
         })
     
@@ -4565,17 +5139,26 @@ def delete_upload(request, upload_id):
 def cancel_upload(request, upload_id):
     """
     Cancel an upload session that is stuck or in progress.
-    Only allows cancellation of non-completed uploads by the user who created them.
+    Allows cancellation of non-completed uploads by the creator,
+    an authorized member of the same subscriber organization, or staff.
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     try:
-        # Get the upload session, ensuring it belongs to the current user
-        upload_session = UploadSession.objects.get(
-            id=upload_id,
-            user=request.user
-        )
+        if request.user.is_staff or request.user.is_superuser:
+            upload_session = UploadSession.objects.get(id=upload_id)
+        else:
+            from acctmgt.models import UserProfile
+            profile = UserProfile.get_or_create_profile(request.user)
+            bound_sub_id = profile.bound_subscriber_id if (profile and profile.is_bound) else None
+            
+            upload_session = UploadSession.objects.filter(id=upload_id).filter(
+                Q(user=request.user) | (Q(subscriber_id=bound_sub_id) if bound_sub_id else Q(user=request.user))
+            ).first()
+            
+            if not upload_session:
+                raise UploadSession.DoesNotExist
         
         # Only allow cancellation of non-completed uploads
         if upload_session.status in ['completed', 'cancelled']:
@@ -4583,8 +5166,42 @@ def cancel_upload(request, upload_id):
                 'error': f'Cannot cancel an upload that is already {upload_session.status}'
             }, status=400)
         
-        # Mark as cancelled
-        upload_session.mark_cancelled(reason='Cancelled by user from dashboard')
+        # 1. Write cancellation sentinel marker file immediately (cross-process, instant detection)
+        marker_path = os.path.join(settings.MEDIA_ROOT, 'temp', f'cancelled_{upload_id}')
+        try:
+            os.makedirs(os.path.dirname(marker_path), exist_ok=True)
+            with open(marker_path, 'w') as f:
+                f.write(f'cancelled_by_{request.user.username}')
+        except Exception as err:
+            logger.warning(f"[CANCEL] Could not write marker file: {err}")
+
+        # 2. Mark as cancelled in model and direct SQL update to prevent race conditions
+        reason = f'Cancelled by user {request.user.username}'
+        UploadSession.objects.filter(id=upload_id).update(
+            status='cancelled',
+            current_message=reason,
+            progress_percentage=0,
+            completed_at=timezone.now()
+        )
+        upload_session.mark_cancelled(reason=reason)
+        logger.info(f"[CANCEL] UploadSession {upload_id} marked as cancelled by user {request.user.username}")
+        
+        # 3. Clean up any temp Parquet files created so far (preserve sentinel marker for workers)
+        try:
+            from .tasks import cleanup_temp_files
+            cleanup_temp_files(upload_id, keep_unmatched_credits=False, preserve_cancellation_marker=True)
+        except Exception:
+            pass
+
+        # 4. If task is still in Django Q OrmQ queue, purge it so workers never pick it up
+        try:
+            from django_q.models import OrmQ
+            OrmQ.objects.filter(name__contains=str(upload_id)).delete()
+        except Exception:
+            pass
+
+        # 5. Clear all verification state from session unconditionally
+        clear_verification_session(request)
         
         return JsonResponse({
             'success': True,
@@ -4595,7 +5212,7 @@ def cancel_upload(request, upload_id):
         return JsonResponse({
             'error': 'Upload not found or you do not have permission to cancel it'
         }, status=404)
-    
+        
     except Exception as e:
         return JsonResponse({
             'error': f'An error occurred while cancelling the upload: {str(e)}'
@@ -4707,6 +5324,7 @@ def build_excel_report(upload_session, user=None):
     subscriber_data = [
         ['Subscriber Name:', subscriber.subscriber_name if subscriber else 'Unknown'],
         ['Subscriber ID:', str(upload_session.subscriber_id)],
+        ['Original Filename:', upload_session.original_filename or 'N/A'],
         ['Processing Date:', upload_session.uploaded_at.strftime('%B %d, %Y') if upload_session.uploaded_at else 'N/A'],
         ['Processing Time:', upload_session.completed_at.strftime('%I:%M %p') if upload_session.completed_at else 'N/A']
     ]
@@ -4719,28 +5337,9 @@ def build_excel_report(upload_session, user=None):
     
     row += 1
     
-    # File Processing Details Section
-    ws_summary[f'A{row}'] = "FILE PROCESSING DETAILS"
-    ws_summary[f'A{row}'].font = section_font
-    row += 1
-    
-    processing_data = [
-        ['Original Filename:', upload_session.original_filename or 'N/A'],
-        ['Processing Duration:', f"{upload_session.processing_time:.2f} seconds" if upload_session.processing_time else 'Not recorded'],
-        ['Processing Status:', upload_session.get_status_display()],
-        ['Processing Method:', 'Automated Excel Processing with Data Validation']
-    ]
-    
-    for label, value in processing_data:
-        ws_summary[f'A{row}'] = label
-        ws_summary[f'B{row}'] = value
-        ws_summary[f'A{row}'].font = Font(bold=True, size=10)
-        row += 1
-    
-    row += 1
-    
     # Processing Results Section (replacing Credit Records Merge Analysis)
     ws_summary[f'A{row}'] = "PROCESSING RESULTS"
+
     ws_summary[f'A{row}'].font = section_font
     row += 1
     
@@ -5282,12 +5881,65 @@ def progress_api(request, session_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@login_required
+def check_upload_quota(request):
+    """
+    AJAX endpoint to verify if the selected reporting month and year
+    has already been completed for the user's organization.
+    """
+    month = request.GET.get('month')
+    year = request.GET.get('year')
+    if not month or not year:
+        return JsonResponse({'is_locked': False})
+
+    try:
+        month = int(month)
+        year = int(year)
+    except ValueError:
+        return JsonResponse({'is_locked': False})
+
+    # Multi-subscriber users are never locked
+    if request.user.groups.filter(name='multi_subscriber').exists():
+        return JsonResponse({'is_locked': False, 'is_multi_subscriber': True})
+
+    from acctmgt.models import UserProfile
+    from .models import UploadSession
+    profile = UserProfile.objects.filter(user=request.user, is_bound=True).first()
+    if not profile or not profile.bound_subscriber_id:
+        return JsonResponse({'is_locked': False})
+
+    completed_session = UploadSession.objects.filter(
+        subscriber_id=profile.bound_subscriber_id,
+        reporting_month=month,
+        reporting_year=year,
+        status='completed'
+    ).order_by('-completed_at').first()
+
+    if completed_session:
+        import calendar
+        sub = profile.get_bound_subscriber()
+        sub_name = sub.subscriber_name if sub else f"ID: {profile.bound_subscriber_id}"
+        completed_date = completed_session.completed_at.strftime('%b %d, %Y') if completed_session.completed_at else 'Earlier'
+        month_name = calendar.month_name[month]
+        return JsonResponse({
+            'is_locked': True,
+            'subscriber_name': sub_name,
+            'month_name': month_name,
+            'year': year,
+            'completed_date': completed_date,
+            'session_id': completed_session.id,
+            'filename': completed_session.original_filename or completed_session.filename
+        })
+
+    return JsonResponse({'is_locked': False})
+
+
 @csrf_exempt
 @login_required
 def submit_feedback(request):
     """
-    Handle feedback submission from the in-app feedback modal.
-    Accepts POST with JSON body containing rating, category, message.
+    Handle feedback and re-upload requests from the in-app feedback modal.
+    Accepts POST with JSON body containing rating, category, message, contact_email.
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
@@ -5297,19 +5949,23 @@ def submit_feedback(request):
         data = json.loads(request.body)
         
         rating = data.get('rating')
+        try:
+            rating = int(rating) if rating is not None else 0
+        except (ValueError, TypeError):
+            rating = 0
+            
         category = data.get('category', 'general')
         message = data.get('message', '').strip()
         page_url = data.get('page_url', '')
-        
-        # Validate required fields
-        if not rating or not isinstance(rating, int) or rating < 1 or rating > 5:
-            return JsonResponse({'error': 'Please provide a valid rating (1-5)'}, status=400)
+        contact_email = data.get('contact_email', '').strip()
+        if not contact_email and request.user.is_authenticated:
+            contact_email = request.user.email or ''
         
         if not message:
-            return JsonResponse({'error': 'Please provide feedback message'}, status=400)
+            return JsonResponse({'error': 'Please provide a message explaining your request or feedback'}, status=400)
         
         # Validate category
-        valid_categories = ['bug', 'feature', 'general']
+        valid_categories = ['bug', 'feature', 'general', 'reupload_request']
         if category not in valid_categories:
             category = 'general'
         
@@ -5318,13 +5974,14 @@ def submit_feedback(request):
         
         feedback = Feedback.objects.create(
             user=request.user if request.user.is_authenticated else None,
+            contact_email=contact_email,
             rating=rating,
             category=category,
             message=message,
             page_url=page_url
         )
         
-        logger.info(f"[FEEDBACK] New feedback submitted: {feedback.category} - {feedback.rating}★ from {request.user.username}")
+        logger.info(f"[FEEDBACK] New feedback submitted: {feedback.category} from {request.user.username}")
         
         # Send email notification
         try:
@@ -5343,13 +6000,36 @@ def submit_feedback(request):
             except Exception:
                 pass
             
-            star_display = '★' * rating + '☆' * (5 - rating)
-            email_subject = f'[Feedback] {feedback.get_category_display()} - {star_display}'
-            email_body = f"""New feedback received from the Data Processing Suite:
+            if category == 'reupload_request':
+                email_subject = f'[Re-upload Request] {subscriber_name} - Action Required'
+                email_body = f"""*** URGENT: RE-UPLOAD / CORRECTION REQUEST ***
+
+An organization has requested an administrative unlock to re-upload their monthly credit data:
+
+Organization:    {subscriber_name}
+User:            {request.user.username if request.user.is_authenticated else 'Anonymous'}
+Contact Email:   {contact_email or 'Not provided'}
+Submitted At:    {feedback.created_at.strftime('%Y-%m-%d %H:%M:%S') if feedback.created_at else 'N/A'}
+Page URL:        {page_url}
+
+Reason / Message from Organization:
+{message}
+
+---------------------------------------------------------------------------------
+To review and invalidate their completed session to allow re-upload:
+1. Go to Django Admin: /admin/auto/uploadsession/
+2. Locate the completed session for {subscriber_name}
+3. Select the session and choose action: 'Invalidate Session (Allow Re-upload for Period)'
+---------------------------------------------------------------------------------
+View all feedback entries at: /admin/auto/feedback/
+"""
+            else:
+                email_subject = f'[Feedback] {feedback.get_category_display()} - {subscriber_name}'
+                email_body = f"""New feedback received from the Data Processing Suite:
 
 User: {request.user.username if request.user.is_authenticated else 'Anonymous'}
-Subscriber: {subscriber_name}
-Rating: {star_display} ({rating}/5)
+Organization: {subscriber_name}
+Contact Email: {contact_email or 'Not provided'}
 Category: {feedback.get_category_display()}
 Page: {page_url}
 Time: {feedback.created_at.strftime('%Y-%m-%d %H:%M:%S') if feedback.created_at else 'N/A'}
@@ -5371,9 +6051,10 @@ View all feedback at: /admin/auto/feedback/
         except Exception as email_error:
             logger.warning(f"[FEEDBACK] Email notification failed: {str(email_error)}")
         
+        response_msg = 'Your re-upload request has been submitted to the administrator.' if category == 'reupload_request' else 'Thank you for your feedback!'
         return JsonResponse({
             'success': True,
-            'message': 'Thank you for your feedback!'
+            'message': response_msg
         })
         
     except json.JSONDecodeError:
@@ -5381,3 +6062,4 @@ View all feedback at: /admin/auto/feedback/
     except Exception as e:
         logger.error(f"[FEEDBACK] Error saving feedback: {str(e)}")
         return JsonResponse({'error': 'Failed to save feedback. Please try again.'}, status=500)
+

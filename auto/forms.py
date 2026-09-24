@@ -72,6 +72,23 @@ class ExcelUploadForm(forms.Form):
         widget=forms.HiddenInput()
     )
     
+    # Optional split_option for merged files (split vs no_split)
+    split_option = forms.CharField(
+        required=False,
+        initial='split',
+        widget=forms.HiddenInput()
+    )
+    
+    # Optional file_password for password-protected files
+    file_password = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-select-sm form-control',
+            'placeholder': 'Enter file password if protected'
+        }),
+        help_text='Required if the Excel file is password-protected'
+    )
+    
     def clean_file(self):
         """
         Validate uploaded files are genuine Excel or CSV files.

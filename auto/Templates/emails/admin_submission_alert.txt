@@ -1,0 +1,9 @@
+FIRSTCENTRAL CREDIT BUREAU - SUBMISSION ALERT
+Automated Bureau Operations Notification
+
+A subscriber has completed a monthly credit data submission.
+
+- Institution Name: {{ subscriber_name }}{% if subscriber_id %} (ID: {{ subscriber_id }}){% endif %}
+- Reporting Period: {{ reporting_period }}
+- Total Records: {{ total_records }}
+- Uploaded By: {{ uploaded_by }}

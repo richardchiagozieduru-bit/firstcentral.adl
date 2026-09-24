@@ -163,9 +163,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # Authentication settings
-LOGIN_URL = 'acctmgt:login'  # Using the namespaced URL
+LOGIN_URL = '/acctmgt/login/'  # Actual URL path (not namespaced name)
 LOGIN_REDIRECT_URL = 'auto:dashboard'  # Using the namespaced URL for dashboard
-LOGOUT_REDIRECT_URL = 'acctmgt:login'  # Using the namespaced URL
+LOGOUT_REDIRECT_URL = '/acctmgt/login/'  # Actual URL path
+
 
 
 # Django Q Cluster Configuration
@@ -213,7 +214,7 @@ LOGGING = {
         },
         'file': {
             'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOG_DIR, 'app.log'),
             'maxBytes': 5 * 1024 * 1024,  # 5 MB
             'backupCount': 5,
@@ -265,7 +266,7 @@ RATELIMIT_ENABLE = True
 # For feedback notifications and other email functionality
 # =============================================================================
 # Email recipient for feedback notifications
-FEEDBACK_EMAIL_RECIPIENT = config('FEEDBACK_EMAIL_RECIPIENT', default='[EMAIL_ADDRESS]')
+FEEDBACK_EMAIL_RECIPIENT = config('FEEDBACK_EMAIL_RECIPIENT', default='r.duru@firstcentralcreditbureau.com')
 
 # Email backend configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -278,3 +279,27 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='[PASSWORD]')
 EMAIL_TIMEOUT = config('EMAIL_TIMEOUT', default=10, cast=int)
 
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='[EMAIL_ADDRESS]')
+
+# Bureau Administrator submission alert recipients (comma-separated list in .env)
+BUREAU_NOTIFICATION_EMAILS = [
+    email.strip() for email in config(
+        'BUREAU_NOTIFICATION_EMAILS',
+        default=config('FEEDBACK_EMAIL_RECIPIENT', default='r.duru@firstcentralcreditbureau.com')
+    ).split(',') if email.strip()
+]
+
+# =============================================================================
+# TWO-FACTOR AUTHENTICATION (2FA) & EMAIL VERIFICATION CONFIGURATION
+# =============================================================================
+OTP_EXPIRY_MINUTES = config('OTP_EXPIRY_MINUTES', default=10, cast=int)
+OTP_MAX_ATTEMPTS = config('OTP_MAX_ATTEMPTS', default=5, cast=int)
+OTP_RESEND_COOLDOWN_SECONDS = config('OTP_RESEND_COOLDOWN_SECONDS', default=60, cast=int)
+
+# =============================================================================
+# SESSION CONFIGURATION (24-Hour Absolute Security Timeout)
+# =============================================================================
+SESSION_COOKIE_AGE = config('SESSION_COOKIE_AGE', default=86400, cast=int)  # 24 hours
+SESSION_SAVE_EVERY_REQUEST = False  # Absolute expiration: 24 hours from initial login
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+

@@ -1,37 +1,144 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
-from django.utils.html import format_html
+from django.utils.html import format_html, mark_safe
 from django.urls import reverse
 from django.contrib import messages
 from django.utils import timezone
 from .models import UserProfile, UnbindingAuditLog
+from .forms import AdminUserCreationForm
+
+
+from django import forms
+from auto.models import Subscriber
+
+
+class UserProfileForm(forms.ModelForm):
+    """
+    Form for UserProfile in admin with interactive organization dropdown.
+    Allows administrators to assign or update the bound organization directly.
+    """
+    organization_select = forms.ChoiceField(
+        label='Assign / Reassign Organization',
+        required=False,
+        help_text='Select an organization from the list to bind or update this user.'
+    )
+
+    class Meta:
+        model = UserProfile
+        fields = ('organization_select', 'is_bound', 'bound_subscriber_id', 'binding_method', 'binding_token', 'bound_at', 'bound_by_ip')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        choices = [('', '--------- Select Organization ---------')]
+        try:
+            for sub in Subscriber.objects.all().order_by('subscriber_name'):
+                choices.append((str(sub.subscriber_id), f"{sub.subscriber_name} (ID: {sub.subscriber_id})"))
+        except Exception:
+            pass
+        self.fields['organization_select'].choices = choices
+        if self.instance and self.instance.bound_subscriber_id:
+            self.fields['organization_select'].initial = str(self.instance.bound_subscriber_id)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        org_sel = cleaned_data.get('organization_select')
+        if org_sel:
+            try:
+                sub_id = int(float(org_sel))
+                cleaned_data['bound_subscriber_id'] = sub_id
+                cleaned_data['is_bound'] = True
+                cleaned_data['binding_method'] = 'admin'
+                if not self.instance.bound_at:
+                    cleaned_data['bound_at'] = timezone.now()
+            except (ValueError, TypeError):
+                pass
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        org_sel = self.cleaned_data.get('organization_select')
+        if org_sel:
+            try:
+                sub_id = int(float(org_sel))
+                instance.bound_subscriber_id = sub_id
+                instance.is_bound = True
+                instance.binding_method = 'admin'
+                if not instance.bound_at:
+                    instance.bound_at = timezone.now()
+            except (ValueError, TypeError):
+                pass
+        if commit:
+            instance.save()
+        return instance
 
 
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
+    form = UserProfileForm
     can_delete = False
     verbose_name_plural = 'User Profile'
     fk_name = 'user'
-    readonly_fields = ('binding_token', 'bound_at', 'bound_by_ip')
+    readonly_fields = ('get_subscriber_display', 'binding_token', 'bound_at', 'bound_by_ip')
     
     fieldsets = (
         ('Subscriber Binding', {
             'fields': (
-                'is_bound', 'bound_subscriber_id', 'binding_method',
+                'get_subscriber_display', 'organization_select', 'is_bound', 'bound_subscriber_id', 'binding_method',
                 'binding_token', 'bound_at', 'bound_by_ip'
             ),
-            'description': 'Permanent binding between user and subscriber'
+            'description': 'Permanent binding between user and organization / subscriber'
         }),
     )
 
+    def get_subscriber_display(self, obj):
+        if obj and obj.bound_subscriber_id:
+            sub = obj.get_bound_subscriber()
+            if sub:
+                return format_html('<strong style="color: #1B3D8C; font-size: 1.05em;">{} (ID: {})</strong>', sub.subscriber_name, obj.bound_subscriber_id)
+            return f"ID: {obj.bound_subscriber_id}"
+        return mark_safe('<span style="color: red;">Not Bound</span>')
+    get_subscriber_display.short_description = 'Bound Organization'
+
 
 class CustomUserAdmin(UserAdmin):
+    add_form = AdminUserCreationForm
+    add_fieldsets = (
+        ('Account Credentials', {
+            'classes': ('wide',),
+            'fields': ('username', 'email', 'password1', 'password2'),
+            'description': 'Enter the organization credentials. Account will be active immediately.'
+        }),
+        ('Organization Assignment (Required)', {
+            'classes': ('wide',),
+            'fields': ('subscriber',),
+            'description': 'Select the organization this user represents. The account will be strictly bound to this organization.'
+        }),
+        ('Personal Details (Optional)', {
+            'classes': ('wide',),
+            'fields': ('first_name', 'last_name'),
+        }),
+    )
     inlines = (UserProfileInline, )
     list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'get_bound_subscriber')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'profile__is_bound')
     search_fields = ('username', 'email', 'first_name', 'last_name', 'profile__bound_subscriber_id')
     actions = ['unbind_selected_users', 'show_binding_details']
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        # Ensure profile binding is saved when creating a user via AdminUserCreationForm
+        if 'subscriber' in getattr(form, 'cleaned_data', {}):
+            subscriber = form.cleaned_data['subscriber']
+            if subscriber:
+                sub_id = subscriber.subscriber_id if hasattr(subscriber, 'subscriber_id') else int(subscriber)
+                profile, _ = UserProfile.objects.get_or_create(user=obj)
+                profile.bound_subscriber_id = sub_id
+                profile.is_bound = True
+                profile.binding_method = 'admin'
+                if not profile.bound_at:
+                    profile.bound_at = timezone.now()
+                profile.save()
     
     def get_bound_subscriber(self, obj):
         try:
@@ -46,9 +153,9 @@ class CustomUserAdmin(UserAdmin):
                     '<span style="color: orange;">ID:{}</span>',
                     obj.profile.bound_subscriber_id
                 )
-            return format_html('<span style="color: red;">Not Bound</span>')
+            return mark_safe('<span style="color: red;">Not Bound</span>')
         except Exception:
-            return format_html('<span style="color: red;">Error</span>')
+            return mark_safe('<span style="color: red;">Error</span>')
     
     get_bound_subscriber.short_description = 'Bound Subscriber'
     get_bound_subscriber.admin_order_field = 'profile__bound_subscriber_id'
@@ -170,6 +277,7 @@ class UserProfileAdmin(admin.ModelAdmin):
     """
     Dedicated admin interface for UserProfile to manage bindings
     """
+    form = UserProfileForm
     list_display = ('user', 'is_bound', 'get_subscriber_name', 'binding_method', 'bound_at')
     list_filter = ('is_bound', 'binding_method', 'bound_at')
     search_fields = ('user__username', 'user__email', 'bound_subscriber_id')
@@ -181,7 +289,7 @@ class UserProfileAdmin(admin.ModelAdmin):
             'fields': ('user',)
         }),
         ('Binding Status', {
-            'fields': ('is_bound', 'bound_subscriber_id', 'binding_method')
+            'fields': ('organization_select', 'is_bound', 'bound_subscriber_id', 'binding_method')
         }),
         ('Binding Details', {
             'fields': ('binding_token', 'bound_at', 'bound_by_ip'),
@@ -201,7 +309,7 @@ class UserProfileAdmin(admin.ModelAdmin):
                 '<span style="color: orange;">ID:{}</span>',
                 obj.bound_subscriber_id
             )
-        return format_html('<span style="color: red;">Not Bound</span>')
+        return mark_safe('<span style="color: red;">Not Bound</span>')
     
     get_subscriber_name.short_description = 'Subscriber'
     get_subscriber_name.admin_order_field = 'bound_subscriber_id'
@@ -240,6 +348,28 @@ class UserProfileAdmin(admin.ModelAdmin):
     unbind_selected_profiles.short_description = "Unbind selected user profiles"
 
 
+from .models import UserProfile, UnbindingAuditLog, EmailVerificationOTP
+
+
+@admin.register(EmailVerificationOTP)
+class EmailVerificationOTPAdmin(admin.ModelAdmin):
+    list_display = ('user', 'otp_code', 'otp_type', 'is_verified', 'attempts', 'created_at', 'expires_at', 'status_display')
+    list_filter = ('otp_type', 'is_verified', 'created_at')
+    search_fields = ('user__username', 'user__email', 'otp_code')
+    readonly_fields = ('user', 'otp_code', 'otp_type', 'created_at', 'expires_at', 'attempts', 'ip_address')
+    ordering = ('-created_at',)
+
+    def status_display(self, obj):
+        if obj.is_verified:
+            return mark_safe('<span style="color: green; font-weight: bold;">Verified</span>')
+        elif obj.is_expired():
+            return mark_safe('<span style="color: red;">Expired</span>')
+        return mark_safe('<span style="color: orange; font-weight: bold;">Active</span>')
+    status_display.short_description = 'Status'
+
+
+
 # Unregister the default UserAdmin and register our custom one
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
+

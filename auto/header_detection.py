@@ -199,7 +199,7 @@ def find_header_row_csv(file_path, max_scan_rows=10):
         return 0
 
 
-def find_header_row(file_path, sheet_name, max_scan_rows=10):
+def find_header_row(file_path, sheet_name, max_scan_rows=10, password=None):
     """
     Find the row containing actual column headers by fuzzy matching.
     
@@ -211,23 +211,33 @@ def find_header_row(file_path, sheet_name, max_scan_rows=10):
         file_path: Path to the Excel file
         sheet_name: Name of the worksheet to analyze
         max_scan_rows: Maximum number of rows to scan (default 10)
+        password: Optional password for encrypted files
     
     Returns:
         int: 0-indexed row number containing headers (default 0 if no match found)
     """
     try:
-        # Determine engine based on file extension (.xlsb requires pyxlsb)
-        engine = 'pyxlsb' if file_path.lower().endswith('.xlsb') else None
-        
-        # Read first N rows without assuming any header
-        raw_df = pd.read_excel(
-            file_path, 
-            sheet_name=sheet_name, 
-            header=None, 
-            nrows=max_scan_rows,
-            dtype=object,
-            engine=engine
-        )
+        # If password provided or standard Excel format, use read_excel_file helper
+        if password or (not file_path.lower().endswith('.xlsb') and not file_path.lower().endswith(('.csv', '.txt'))):
+            from .tasks import read_excel_file
+            excel_file = read_excel_file(file_path, filename=sheet_name, password=password)
+            raw_df = pd.read_excel(
+                excel_file,
+                sheet_name=sheet_name,
+                header=None,
+                nrows=max_scan_rows,
+                dtype=object
+            )
+        else:
+            engine = 'pyxlsb' if file_path.lower().endswith('.xlsb') else None
+            raw_df = pd.read_excel(
+                file_path, 
+                sheet_name=sheet_name, 
+                header=None, 
+                nrows=max_scan_rows,
+                dtype=object,
+                engine=engine
+            )
         
         if raw_df.empty:
             logger.info(f"[HEADER DETECTION] Sheet '{sheet_name}' is empty, defaulting to row 0")

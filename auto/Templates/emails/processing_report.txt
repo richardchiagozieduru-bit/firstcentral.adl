@@ -1,0 +1,26 @@
+Dear {{ user_display }},
+
+Your data processing for {{ subscriber_name }} has been completed successfully.
+
+PROCESSING SUMMARY:
+- Individual Records: {{ individual_count }}
+- Corporate Records: {{ corporate_count }}
+- Unmatched Credits: {{ unmatched_credit_count }}
+- Excluded Records: {{ excluded_count }} (Individual: {{ excluded_individual }}, Corporate: {{ excluded_corporate }})
+{% if reporting_period %}- Period: {{ reporting_period }}{% endif %}
+- Completed At: {{ completed_at }}
+{% if processing_time_str %}- Processing Time: {{ processing_time_str }}{% endif %}
+
+{% if is_attached %}
+The detailed analysis report is attached to this email as an Excel file.
+{% else %}
+Your analysis report exceeds email attachment limits (20MB+) and is available for instant download via the portal:
+{{ download_url }}
+{% endif %}
+
+Dashboard Link: {{ dashboard_url }}
+
+---
+Best regards,
+First Central Credit Bureau
+Automated Data Loader Suite

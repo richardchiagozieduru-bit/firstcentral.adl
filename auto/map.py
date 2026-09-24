@@ -86,7 +86,7 @@ credit_mapping = {
         'LOANEFFECTIVEDATE': ['dateofloanfacility','dateloanfacilitydisbursementloaneffectivedate','dateofloanfacilitydisbursmentloaneffectivedate','disbursementloaneffectivedate','loaneffectivedate','dateofloandisbursement','Date of Loan disbursement','dateofloan','dateloandisbursedloaneffectivedate','dateofloanfacilitydisbursementloaneffectivedate','loaneffectivedate','dateofdisbursement','disbursementdate','dateaccountopened','dateopened','firstdisbdt','opendate','dateacctopenned','dateofmortgagefacilityapproval','effectdate','startdate','accountactivationfirstdisbursementdate','startdate','dteaccountopened','dateaccountopened','accountactivationfirstdisbursementdate','dateofdisbursement','acctopndate','effectivedate','loaneffectivedate','accountactivationfirstdisbursementdate','disbutiondate','dateofcreditfacilityapproval','approvaldatedateoffirstdisbursement','approvaldate','issdate','issuedate','tdate','facilityapprovaldate','firstdisburmentdate','dateofdisbursementloaneffective','dateofloanfacilitydisbursement','loandisbursementdate'],
         'DEFEREDPAYMENTDATE':['DEFEREDPAYMENTDATE','deferedpaymentdate'],
         'CREDITLIMIT': ['creditlimit','creditlimitfacilityamountgloballimit','facilityamount','globallimit','openbalfirstdisbursementamt','amountgranted','openbalancecreditlimit','openingbalance','sanctlim','loanamountorcreditlimitforoverdraftaccounts','creditlimitfacilityamountgloballimit','currentbalance','amountequity','credlimit'],
-        'AVAILEDLIMIT': ['loanamountavailbal','availedlimit','facilityamount','facilityamt','availedlimited','loanamount','loanfacilityamount','loanamountavailedlimit','loanfacilityamountavailedlimit','loanfacilityamountavailedlimitngn','amountdisbursed','amountgranted','openingbalance','openbalance','loanfacilityamountavailedlimit','loanfacilityamount','approvedamt','amountdisbursedtilldate','approvedamount','openingbalance','amountgrantedcreditcardlimit','loanamountavailedlimit','principal','approvedamount','loanfacilityamountavailedlimitngn','loanamt','amountapproved','loanamtloanamt','loanfacilityamountavailedlimit'],
+        'AVAILEDLIMIT': ['availedlimit','facilityamount','facilityamt','availedlimited','loanamount','loanfacilityamount','loanamountavailedlimit','loanfacilityamountavailedlimit','loanfacilityamountavailedlimitngn','amountdisbursed','amountgranted','openingbalance','openbalance','loanfacilityamountavailedlimit','loanfacilityamount','approvedamt','amountdisbursedtilldate','approvedamount','openingbalance','amountgrantedcreditcardlimit','loanamountavailedlimit','principal','approvedamount','loanfacilityamountavailedlimitngn','loanamt','amountapproved','loanamtloanamt','loanfacilityamountavailedlimit'],
         'OUTSTANDINGBALANCE': ['newoutstandingbalprincipal','outstandingbalance','outstandingbalancengn','accountbalance','openingbalance','currentbalance','accountbal','balcurr','currentbal','principaloutstandingamount','outstandingprincipal','clrbalamt','trandatebal','currentoutstandingbalance','currentoutstanding','accountbalancecreditbalance','balance','totaloutstanding','acctbalance'],
         'CURRENTBALANCEDEBITIND':['currentbalancedebitind'],
         'INSTALMENTAMOUNT': ['instalmentamount','installmentamount','installamtprincipal','instalmentamt','installmentamountprincipal','totalinstallmentamount','installmentamount','instalmentamountn','installmentalamountprincipalpaidsofar','instalmentprincipal','instamt'],
@@ -240,7 +240,7 @@ consumer_merged_mapping={
         'LOANEFFECTIVEDATE': ['dateofloanfacility','dateofloanfacilitydisbursmentloaneffectivedate','disbursementloaneffectivedate','loaneffectivedate','dateofloandisbursement','Date of Loan disbursement','dateofloan','dateloandisbursedloaneffectivedate','dateofloanfacilitydisbursementloaneffectivedate','loaneffectivedate','dateofdisbursement','disbursementdate','dateaccountopened','dateopened','firstdisbdt','opendate','dateacctopenned','dateofmortgagefacilityapproval','effectdate','startdate','accountactivationfirstdisbursementdate','startdate','dteaccountopened','dateaccountopened','accountactivationfirstdisbursementdate','dateofdisbursement','acctopndate','effectivedate','loaneffectivedate','accountactivationfirstdisbursementdate','disbutiondate','dateofcreditfacilityapproval','approvaldatedateoffirstdisbursement','approvaldate','issdate','issuedate','tdate','facilityapprovaldate','firstdisburmentdate'],
         'DEFEREDPAYMENTDATE':['DEFEREDPAYMENTDATE','deferedpaymentdate'],
         'CREDITLIMIT': ['creditlimit','creditlimitfacilityamountgloballimit','facilityamount','globallimit','openbalfirstdisbursementamt','amountgranted','openbalancecreditlimit','openingbalance','sanctlim','loanamountorcreditlimitforoverdraftaccounts','creditlimitfacilityamountgloballimit','currentbalance','amountequity'],
-        'AVAILEDLIMIT': ['availedlimit','facilityamount','facilityamt','availedlimited','loanamount','loanfacilityamount','loanamountavailedlimit','loanfacilityamountavailedlimit','loanfacilityamountavailedlimitngn','amountdisbursed','amountgranted','openingbalance','openbalance','loanfacilityamountavailedlimit','loanfacilityamount','approvedamt','amountdisbursedtilldate','approvedamount','openingbalance','amountgrantedcreditcardlimit','loanamountavailedlimit','loanamountavailbal','principal','approvedamount','loanamt','loanamountavailbal','amountapproved','loanamtloanamt','loanfacilityamountavailedlimit'],
+        'AVAILEDLIMIT': ['availedlimit','facilityamount','facilityamt','availedlimited','loanamount','loanfacilityamount','loanamountavailedlimit','loanfacilityamountavailedlimit','loanfacilityamountavailedlimitngn','amountdisbursed','amountgranted','openingbalance','openbalance','loanfacilityamountavailedlimit','loanfacilityamount','approvedamt','amountdisbursedtilldate','approvedamount','openingbalance','amountgrantedcreditcardlimit','loanamountavailedlimit','principal','approvedamount','loanamt','amountapproved','loanamtloanamt','loanfacilityamountavailedlimit'],
         'OUTSTANDINGBALANCE': ['newoutstandingbalprincipal','outstandingbalance','accountbalance','openingbalance','currentbalance','accountbal','balcurr','currentbal','principaloutstandingamount','outstandingprincipal','clrbalamt','trandatebal','currentoutstandingbalance','currentoutstanding','accountbalancecreditbalance','balance','totaloutstanding','acctbalance'],
         'CURRENTBALANCEDEBITIND':['currentbalancedebitind'],
         'INSTALMENTAMOUNT': ['instalmentamount','installmentamount','installamtprincipal','instalmentamt','installmentamountprincipal','totalinstallmentamount','installmentamount','instalmentamountn','installmentalamountprincipalpaidsofar'],
@@ -327,7 +327,7 @@ commercial_merged_mapping = {
         'LOANEFFECTIVEDATE': ['dateofloanfacility','dateofloanfacilitydisbursmentloaneffectivedate','disbursementloaneffectivedate','loaneffectivedate','dateofloandisbursement','Date of Loan disbursement','dateofloan','dateloandisbursedloaneffectivedate','dateofloanfacilitydisbursementloaneffectivedate','loaneffectivedate','dateofdisbursement','disbursementdate','dateaccountopened','dateopened','firstdisbdt','opendate','dateacctopenned','dateofmortgagefacilityapproval','effectdate','startdate','accountactivationfirstdisbursementdate','startdate','dteaccountopened','dateaccountopened','accountactivationfirstdisbursementdate','dateofdisbursement','acctopndate','effectivedate','loaneffectivedate','accountactivationfirstdisbursementdate','disbutiondate','dateofcreditfacilityapproval','approvaldatedateoffirstdisbursement','approvaldate','issdate','issuedate','tdate','facilityapprovaldate','firstdisburmentdate'],
         'DEFEREDPAYMENTDATE':['DEFEREDPAYMENTDATE','deferedpaymentdate'],
         'CREDITLIMIT': ['creditlimitfacilityamountgloballimit','creditlimit','creditlimitfacilityamountgloballimit','facilityamount','globallimit','openbalfirstdisbursementamt','amountgranted','openbalancecreditlimit','openingbalance','sanctlim','loanamountorcreditlimitforoverdraftaccounts','creditlimitfacilityamountgloballimit','currentbalance','amountequity'],
-        'AVAILEDLIMIT': ['loanamountavailbal','loanfacilityamountavailedlimitngn','availedlimit','facilityamount','facilityamt','availedlimited','loanamount','loanfacilityamount','loanamountavailedlimit','loanfacilityamountavailedlimit','amountdisbursed','amountgranted','openingbalance','openbalance','loanfacilityamountavailedlimit','loanfacilityamount','approvedamt','amountdisbursedtilldate','approvedamount','openingbalance','amountgrantedcreditcardlimit','loanamountavailedlimit','principal','approvedamount','loanamt','amountapproved','loanamtloanamt','loanfacilityamountavailedlimit'],
+        'AVAILEDLIMIT': ['loanfacilityamountavailedlimitngn','availedlimit','facilityamount','facilityamt','availedlimited','loanamount','loanfacilityamount','loanamountavailedlimit','loanfacilityamountavailedlimit','amountdisbursed','amountgranted','openingbalance','openbalance','loanfacilityamountavailedlimit','loanfacilityamount','approvedamt','amountdisbursedtilldate','approvedamount','openingbalance','amountgrantedcreditcardlimit','loanamountavailedlimit','principal','approvedamount','loanamt','amountapproved','loanamtloanamt','loanfacilityamountavailedlimit'],
         'OUTSTANDINGBALANCE': ['newoutstandingbalprincipal','outstandingbalance','accountbalance','openingbalance','currentbalance','accountbal','balcurr','currentbal','principaloutstandingamount','outstandingprincipal','clrbalamt','trandatebal','currentoutstandingbalance','currentoutstanding','accountbalancecreditbalance','balance','totaloutstanding','acctbalance'],
         'CURRENTBALANCEDEBITIND':['currentbalancedebitind'],
         'INSTALMENTAMOUNT': ['instalmentamount','installmentamount','installamtprincipal','instalmentamt','installmentamountprincipal','totalinstallmentamount','installmentamount','instalmentamountn','installmentalamountprincipalpaidsofar'],
@@ -387,7 +387,7 @@ commercial_merged_mapping = {
         'PRINCIPALOFFICER2OTHERIDNUMBER':['principalofficer2otheridnumber','principal officer 2 other id number','principal officer2 other id number'],
         'PRINCIPALOFFICER2PHONENUMBER': ['phoneno11','principal officer2 phone number','principal officer2 phonenumber','principalofficer2phonenumber','principal officer2 phone no','principalofficer2phoneno','phonenumber11','phone number1','phonenumber11','phoneno11','phoneno1','phone no11','phoneno 11','PRINCIPALOFFICER2PHONENUMBER', 'P2PHONE NO1', 'PHONE NO 2','P_PHONE NO1','PRINCIPAL OFFICER2 PHONE NO1'],
         'PRINCIPALOFFICER2EMAILADDRESS': ['PRINCIPALOFFICER2EMAILADDRESS','principalofficer2emailaddress','emailaddress1','email address1','emailaddress1','P2EMAIL ADDRESS','E-MAIL ADDRESS1','PRINCIPAL OFFICER2 E MAIL ADDRESS','email1','emailaddress'],
-        'PRINCIPALOFFICER2POSITIONINBUSINESS': ['positioninbusiness1','principal officer2 position in business','principalofficer2positioninbusiness','principalofficer2positioninbusiness1','position in business1','PRINCIPALOFFICER2POSITIONINBUSINESS','P2POSITION IN BUSINESS','PRINCIPAL OFFICER2 POSITION IN BUSINESS','Position In Business 2']
+        'PRINCIPALOFFICER2POSITIONINBUSINESS': ['positioninbusiness1','principal officer2 position in business','principalofficer2positioninbusiness','principalofficer2positioninbusiness1','position in business1''PRINCIPALOFFICER2POSITIONINBUSINESS','P2POSITION IN BUSINESS','PRINCIPAL OFFICER2 POSITION IN BUSINESS','Position In Business 2']
     }
 
 
@@ -681,10 +681,10 @@ state_dict = {'Abia': ['abia', 'abia state','1','01','001','abiastate','ab'],
              }
 Marital_dict = {
     'Married': ['m', 'married', 'marry'],
-    'Single': ['single', 's'],
-    'Widower': ['wr', 'widower'],
-    'Widow': ['wd', 'widow'],
-    'Divorced': ['d', 'divorced']
+    'Single': ['single', 's','singl'],
+    'Widower': ['wr', 'widower','widowr'],
+    'Widow': ['wd', 'widow','wid'],
+    'Divorced': ['d', 'divorced','divorce']
 }
 Borrower_dict = {
     'Individual': ['individual', 'i','ind'],
@@ -1127,9 +1127,9 @@ Loan_dict = {'Commercial Overdraft': ['commercialoverdraft', '1', '01', '001', '
                  'Letter Of Credit':['y','Y'],
                  }
 
-Repayment_dict = {'Weekly':['d','w','1','days','day','weekly','daily','01','001','day','week','wkly','wk'],
-                  'Forthnightly':['f','2','forthnight','02','002','forth','forthnightly','fortnightly'],
-                  'Monthly':['m','month','monthly', '3','03','003','mnthly','mnth','mtly','mth','1m'],
+Repayment_dict = {'Weekly':['d','w','1','days','day','weekly','daily','01','001','day','week','wkly','wk','weeks','day s'],
+                  'Forthnightly':['f','2','forthnight','02','002','forth','forthnightly','fortnightly','fourtnightly','fourtnight',],
+                  'Monthly':['m','month','monthly', '3','03','003','mnthly','mnth','mtly','mths','1m','mth','months'],
                   'Quarterly':['q','quarter','quarterly','4','04','004','quaterly'],
                   '6 Months':['5','sixmonth','sixmonths','6months','6month','halfyear','half year','05','005','6 months','6m'],
                   'Yearly': ['y','yearly','year','6','06','006','one year','1year','yr','yrly','annual','annually','1yr'],
@@ -1156,7 +1156,7 @@ Positioninbusiness_dict = { 'Guarantor':['001','guarantor','01','1'],
                              'Proprietor':['002','proprietor','02','2'],
                              'Shareholder':['003','shareholder','03','3'],
                              'Managing Director':['004','managingdirector','04','4','mdceo'],
-                             'Executive Director':['005','05','5','executivedirector','chiefexecutiveofficer','Chief Executive Officer'],
+                             'Executive Director':['005','05','5','executivedirector'],
                              'Alternate Director':['006','06','6','alternatedirector'],
                              'Trustee':['007','07','7','trustee']}
 
@@ -1366,27 +1366,27 @@ CommToConsu={'DATA':['DATA'],
  'FILLER':['']}
 
 commercial_keywords = [
-    'jolly','printers',"CREDIT",'jibwis','lcc','cocin','pta','cwfl','nut','lgea','exam', "GVL", "LOA", "POL", "NIG","departmental","textbook","LTD", "AAWUNPCU",'Trader', 'farmer','alliance', 'life stock','livestock','chowdeck','entreprise','superstores','beauty place','luxuries',
+    'jolly','printers',"CREDIT",'jibwis','lcc','cocin','pta','cwfl','nut','lgea','exam', "GVL", "LOA", "POL", "NIG","departmental","textbook","LTD", "AAWUNPCU",'farmer','alliance', 'life stock','livestock','chowdeck','entreprise','superstores','beauty place','luxuries',
     "ASUU", "AAWUN", "ACADEMI", "ACADEMY",  "ADCOMTECH", "ADVISER", "ADVOCATE", "ADVOCATES",'blooms','ASSOTIOTION','all boys','A B I Q M','abiqm','cemetary','COMMITEE','POLYTECNIC','high court','housing',
     "AFFAIRS", "AGENCIES", "AGENCY", "AGENDA", "AGRIC", "AGRICULTURAL", "AGRICULTURE", "ALLIED", "ALLOCATION", "ALUMINIUM",'consults','giggles', 'rice ass',' ENTTERPRISES','hosp','gen hosp','internat','airport',
-    "ANGLICAN", "ANNOINTED",  "ASSEMBLIES", "ASSEMBLY", "ASSETS", "ASSICIATES", "ASSOCIATE", "ASSOCIATES", "ASSOCIATION",'court','upper','orphans','vulnerable','supt','init','events','outdoors','initiative','support',
+    "ANGLICAN", "ANNOINTED",  "ASSEMBLIES", "ASSEMBLY", "ASSETS", "ASSICIATES", "ASSOCIATE", "ASSOCIATES", "ASSOCIATION",'upper','orphans','vulnerable','supt','init','events','outdoors','initiative','support',
     "ASSOCIATIONS", "ASSOUTION", "AUTO",  "BATHROOM", "BIOMEDICAL", "BOARD", "BOARDS", "BRANCH", "BREAK",'COMMITTEE','FEEDING','G D S S','SSAUTHRIAL','foto','GSS','L G',
     "BROKERS", "BROTHERS", "BUREAU", "BUSINESS", "BUTCHERS", "CAFETERIA", "CAMP", "CAPITAL", "CARPET",'ASSCTN','rice',' CO OPERATIVE','PROCESSING','L G C S D P',
     "CARPETS", "CARS", "CATERING", "CCTU", "CELLULAR", "CEMENT", "CENTER", "CENTRE", "CHALLENGE", "CHAMBERS",'L G R C','J S S','CARPENTER',
      "CHAPTER", "CHARISMATIC", "CHEMICAL", "CHEMICALS", "CHEMISTS", "CHICKEN", "CHURCH", "CITIZEN", "CITIZENS",'devlopment','FATENING','G D S','G S','P T A', 'ESSSSSS',
-    "CLAY", "CLINIC", "CLOSET", "CLUB", "COOPERATIVE", "COEASU", "COHEADS", "COLLECTION", "COLLECTIONS", "COLLEGE",'COUNCILE','COOPERATIV', 'ASSO',
-    "COLOUR",  "COMMERCIAL", "COMMUNICA", "COMMUNICATION", "COMMUNICATIONS", "COMP", "COMPANY", "COMPRHENSIVE", "COMPUTER",'S U G','G G D S S D','SBMC','WATER','BOAD','KASCOM',
-    "COMPUTERS", "CONCEPT", "CONCEPTS", "CONFERENCE", "CONFRENCE", "CONNECT", "CONSORTIUM", "CONST", "CONSTR", "CONSUING",'KUNGIYAR TAIMAKON KAI DA KAI TA GURAMU A',
+    "CLINIC", "CLOSET", "CLUB", "COOPERATIVE", "COEASU", "COHEADS", "COLLECTION", "COLLECTIONS",'COUNCILE','COOPERATIV', 'ASSO',
+    "COLOUR",  "COMMERCIAL", "COMMUNICA", "COMMUNICATION", "COMMUNICATIONS", "COMP", "COMPRHENSIVE", "COMPUTER",'S U G','G G D S S D','SBMC','WATER','BOAD','KASCOM',
+    "COMPUTERS", "CONCEPT", "CONCEPTS","CONFRENCE", "CONNECT", "CONSORTIUM", "CONST", "CONSTR", "CONSUING",'KUNGIYAR TAIMAKON KAI DA KAI TA GURAMU A',
     "CONSUINGD", "CONSULT", "CONSULTA", "CONSULTANCY", "CONSULTANTS", "CONSULTING", "CONSUMERS", "CONTACT", "CONTRACTOR", "CONTRACTORS",
     "CONTROL", "COOP", "CORP", "CORPORATES", "CORPORATION",  "COY", "CRADLES", "CREATIONS", "CTV",'P T A ESSSSSS CAZ','SUPPORT',
     "CURRENT", "DEPARTMENT", "DEPOT", "DEPT", "DESIGN", "DESIGNS", "DEV", "DEVELOPME", "DEVELOPMENT", "DIGITAL",'TREASURY','feeding',
     "DIOCESE", "DIRECTORATE", "DISABLE", "DISPENSARY", "DIST", "DISTRICT", "DIVERSIFIED", "DIVISION", "DOCKYARD", "DORMANT",
-    "DRILL", "DRINK", "DRINKS", "DRIVERS", "EAST", "ECOBANK", "EDUCATION", "ELECRO", "ELECT", "ELECTRICAL",'MAKARANTAR',' KUNGIYAR TAIMAKON KAI DA KAI TA GURAMU A',
+    "DRILL", "DRINK", "DRINKS", "DRIVERS","ECOBANK", "EDUCATION", "ELECRO", "ELECT", "ELECTRICAL",'MAKARANTAR','KUNGIYAR', 'TAIMAKON',
     "ELECTRICITY", "ELECTRO", "ELECTROMART", "ELECTRONIC", "ELECTRONICS", "EMAGITIONS", "EMPLOYEE", "EMPORIUM", "ENERGY",'KUNGIYAR',
     "ENGINEERING", "ENGINEERS", "ENT", "ENTERPRIS", "ENTERPRISE", "ENVIROMENT", "EQUIPMENT", "ESTATE", "ESTATES", "EXECUTIVE",
     "EXERCISE", "EXPENDITURE", "EXPORT", "EXPORTS", "FABRIC", "FAMILY", "FARM", "FARMER", "FARMERS", "FARMS",'BIRNINKEBBI',
     "FEDERAL", "FINANCE", "FITNESS", "FOOD", "FOODS", "FORMATIONS", "FORUM", "FOUNDATION", "FOURSQUARE", "FRIENDSHIP",
-    "FROZEN", "FURNISHING", "FURNITURE", "FURNITURES", "FUTURE", "GADGET", "GALLERIA", "GARDENS", "GARMENTS", "GENERAL",
+    "FROZEN", "FURNISHING", "FURNITURE", "FURNITURES", "GADGET", "GALLERIA", "GARDENS", "GARMENTS", "GENERAL",
     "GEOINFORMATIC", "GEOPLANNERS", "GIFTS", "GLOBA", "GLOBAL", "GLOBE", "GOV", "GOVERNMENT", "GOVT", "GRASSROOTS",
     "GREENSPRINGS", "GROUP", "GROWERS", "GRP", "GYARTAGERE", "HEALTH", "HELP", "HIGH COURT", "HOLDINGS", "HOMES",
     "HOSPITA", "HOSPITAL", "HOSPITALITY", "HOTEL", "HOUSE", "HOUSES", "IMPEX", "IMPORT", "IMPORTS", "IMPRESSION",
@@ -1399,7 +1399,7 @@ commercial_keywords = [
     "MANUFACT", "MANUFACTURE", "MANUFACTURERS", "MANUFACTURING", "MARBLE", "MARKET", "MARKETING", "MASHIDIMAMI", "MATHNIC", "MEDIA",
     "MEDICAL", "MERCHANDISE", "MGMT", "MICRO", "MICROFINANCE", "MILLENNIUM", "MINERAL", "MINERALS", "MINING", "MINISTRIES",
     "MINISTRY", "MINTING", "MISSION", "MOBILE", "MODERN", "MOSQUE", "MOTORS", "MPCS", "MULTI", "MULTIPURPOSE",
-    "MULTITECH", "MUSICIANS", "Markert", "Marketers", "N U T",  "NATIONAL", "NETWORK", "NIGERIA", "NOODLES",
+    "MULTITECH", "MUSICIANS", "Markert", "Marketers", "N U T",  "NATIONAL", "NETWORK","NOODLES",
     "NORTH", "NURSERY", "NUT", "OCEAN",  "OFFSHORE", "OFPHYSICAL", "OGSG", "OPINION", "ORG",'cup','vanture',
     "ORGANISATION", "ORGANIZATION", "ORIENTAL", "OUTLOOK", "OVERHEAD", "PAINT", "PARTNER", "PARTS", "PAVILION", "PENSION",
      "PERFORMANCE", "PERFORMING", "PETROCHEMICALS", "PETROLEUM", "PETROLSEAL", "PETROSERVE", "PFA", "PHARMA", "PHARMACEUTICAL",
@@ -1413,12 +1413,12 @@ commercial_keywords = [
     "SANCTUARY", "SAVINGS", "SAVIOURS", "SCH", "SCHEME", "SCHEMES", "SCHOOL", "SCHOOLS", "SCIENTIFIC", "SECODARY",
     "SECONDARY", "SECRETARIAT", "SECURITIES", "SECURITY", "SEEDS", "SELLER", "SELLERS", "SERV", "SERVANT", "SERVANTS",
     "SERVI", "SERVICES", "SHARES", "SHIPPING", "SOCEITY", "SOCIETY", "SOLICITOR", "SOLICITORS",'solotions','special bread',
-    "SOLID",  "SOLUTIONS", "SONS", "SOTER", "SOUND", "SOUTH", "SPARE", "SPIRITUAL",'boutique','insights','kitchen','traffic','entreprises',
+    "SOLID",  "SOLUTIONS", "SONS","SOUND", "SOUTH", "SPARE", "SPIRITUAL",'boutique','insights','kitchen','traffic','entreprises',
     "SPORT", "SPORTS", "SPRAYING", "SSANIP", "STANDARD", "STATE", "STATION", "STEEL", "STOC", "STOCK",
     "STORE", "STORES", "STRATEGIC", "STRUCTURAL", "STUDENTS", "SUBSCRIPTION", "SUBSTANCE", "SUITES", "SUPER", "SUPPLY",
     "SUPPY", "SURPRISES", "SURVEILLANCE", "SURVEY", "SYSTEM", "SYSTEMS", "TABERNACLE", "TABLE", "TAX", "TEC",
     "TECHNICAL", "TECHNO", "TECHNOLOGIE", "TECHNOLOGIES", "TELECOMS", "TELEVISION", "TEXTILES", "THEME", "THINKING", "TIMELESS",
-    "TODDLERS", "TOTAL", "TOURIST", "TRADE", "TRADER", "TRADERS", "TRADING", "TRAINING", "TRANS", "TRAVEL",
+    "TODDLERS", "TOTAL", "TOURIST", "TRADE","TRADERS", "TRADING", "TRAINING", "TRANS", "TRAVEL",
     "TRAVELS", "TRUCK", "TRUCKS", "Traditional",  "UNIMAID", "UNION", "UNIONS", "UNIV", "UNIVERSITY",'essentials',
     "USERS", "VALLEY", "VENT", "VENTURE", "VENTURES", "VESSEL", "VESSELS", "WMPCS","sociaty","co operative",
     "WARD",  "WIRELESS", "WOMEN", "WOMEN OF FAITH", "WORKERS", "WORKS", "WORSHIP", "WSSSRP", "XTIAN",
@@ -1426,7 +1426,7 @@ commercial_keywords = [
     "associate", "associates", "association", "authority", "auto", "automobile", "bakery", "bank", "bar", "beautyspa",
     "bootcamp", "branch", "broad", "broker", "building", "bureau", "business", "by", "cakes", "capital",
     "care", "cars", "catering", "catholic", "cattle", "cellphone", "center", "centex", "centre", "chamber",
-    "chambers", "chops", "church", "cleaning", "clothing", "club", "collection", "college", "comm", "communication",
+    "chambers", "chops", "church", "cleaning", "clothing", "club", "collection", "comm", "communication",
     "community", "company", "concept", "concepts", "confection", "conservation", "construction", "constructions", "constructs", "consu",
     "consult", "consultants", "consulting", "contractor", "contribution", "cooperative", "corporate", "country", "couture", "creamery",
     "creative", "cuisine", "culture", "cupcake", "custodian", "data", "dealers", "deco", "decor", "decoration",
@@ -1441,19 +1441,19 @@ commercial_keywords = [
     "loan", "local", "logistic", "logistics", "ltd", "management", "marble", "marine", "market", "marketing",'marketers','marketplace',
     "markets", "media", "medical", "medicare",  "memorial", "merchant", "merchants", "microfinance", "ministries",
     "ministry", "mixed", "monuments", "motors", "multi", "multiventures", "multivest", "municipal", "network",
-    "nigeria", "nitel", "nulge", "odsg", "oil", "organization", "parish", "partners",  "pavilion",'cassava','refinery','refineries',
+    "nitel", "nulge", "odsg", "oil", "organization", "parish", "partners",  "pavilion",'cassava','refinery','refineries',
     "personal", "petroleum", "pharmaceuticals", "pharmacy", "plaza", "premium", "press", "pri", "primary", "product",
     "production", "products", "project", "projects", "property", "proventures", "pry", "publicity", "publish", "publisher",'waters','publishers',
     "rccg", "realtor", "rental", "research", "resources", "restaurant", "resturant", "resturants", "retiree", "road",
     "root", "salon", "saloon", "sch", "school", "schools", "science", "secondary", "security", "service",'WINES','SPIRITS',
     "services", "shop", "smallchops", "society",  "solutions", "sons", "spa", "sparepart", "specialist",'ingredients','ingredient','2e2m',
     "staff", "stardo", "state", "store", "stores", "studio", "studios", "suit", "suites", "supplies",'bee keeping','keeping',
-    "surveillance", "system", "systems", "tech", "technical", "technology", "textile", "tractor", "trade", "trading",'andycos','daughters','daughter',
+    "surveillance","systems", "tech", "technical", "technology", "textile", "tractor", "trade", "trading",'andycos','daughters','daughter',
     "trustee", "uniform",  "unipetrol", "united", "universal", "university", "vanguard", "venture", "ventures",'multibusiness',
     "wardrob",  "washing", "weavers", "welder", "wholesale", "word", "workers", "workshop", "world",'secrets',"yescredit",'info','giants','fm','accounts',
     'accountants','account','chancellors','chancellor','and sons','globus','lapo','interltd','minders','creation',
-    "worldwide", "youth", "youths",'puroyals','fertilizer','investiment','fishsellers','enterprisee','SEWING','GD','G G','S B M C','A U G','tindip','limikted',
-    'astroturf','mfb','catho','coopsociety','tradomedical','interbiz','greens','woodwork','woodworks','icgl',
+    "worldwide", "youth", "youths",'puroyals','fertilizer','investiment','fishsellers','enterprisee','SEWING','G G','S B M C','A U G','tindip','limikted',
+    'astroturf','mfb','catho','coopsociety','tradomedical','interbiz','greens','woodwork','woodworks','icgl','skincare',
     'woodwork','BRIDALS','LIMITLESS','WAVES','LAUNESSENCE','FABRICARE','BIMAQ','TWO','TECHNIKS','RENTALS','mortician', 'morticians','mortuary','mortuaries','morturary','morturaries',]
 
 # ---------------------------------------------------------------------------
@@ -1462,17 +1462,28 @@ commercial_keywords = [
 
 # Tier 1: Legal suffixes — unambiguously commercial, never a person's name
 TIER_1_SUFFIXES = frozenset({
-    'ltd', 'limited', 'plc', 'inc', 'incorporated', 'llc', 'llp',
-    'limi', 'limit', 'limite', 'limted', 'limikted', 'mfb', 'coy'
+    'ltd', 'limited', 'plc', 'inc', 'incorporated', 'llc', 'llp','skincare','BRIDALS','LIMITLESS','WAVES','LAUNESSENCE','FABRICARE','BIMAQ','TWO','TECHNIKS','RENTALS','mortician', 'morticians','mortuary','mortuaries','morturary','morturaries','outfit',
+    'limit', 'limite', 'limted', 'limikted', 'mfb', 'coy',"trustee", "uniform",  "unipetrol", "united", "universal", "university",
+    "COMPUTERS", "CONCEPT", "CONCEPTS","CONFRENCE", "CONNECT", "CONSORTIUM", "CONST", "CONSTR", "CONSUING", 'astroturf','mfb','catho','coopsociety','tradomedical','interbiz','greens','woodwork','woodworks','icgl','embassy','kiosk','closet','printers',"CREDIT",'jibwis','lcc','cocin','pta','cwfl','nut','lgea','exam', "GVL", "LOA", "POL", "NIG","departmental","textbook","LTD", "AAWUNPCU",'farmer','alliance', 'life stock','livestock','chowdeck','entreprise','superstores','beauty place','luxuries',
+    "ASUU", "AAWUN", "ACADEMI", "ACADEMY",  "ADCOMTECH", "ADVISER", "ADVOCATE", "ADVOCATES",'blooms','ASSOTIOTION','all boys','A B I Q M','abiqm','cemetary','COMMITEE','POLYTECNIC','high court','housing',
+    "AFFAIRS", "AGENCIES", "AGENCY", "AGENDA", "AGRIC", "AGRICULTURAL", "AGRICULTURE", "ALLIED", "ALLOCATION", "ALUMINIUM",'consults','giggles', 'rice ass',' ENTTERPRISES','hosp','gen hosp','internat','airport',
+    "ANGLICAN", "ANNOINTED",  "ASSEMBLIES", "ASSEMBLY", "ASSETS", "ASSICIATES", "ASSOCIATE", "ASSOCIATES", "ASSOCIATION",'court','upper','orphans','vulnerable','supt','init','events','outdoors','initiative','support',
+    "ASSOCIATIONS", "ASSOUTION", "AUTO",  "BATHROOM", "BIOMEDICAL", "BOARD", "BOARDS", "BRANCH", "BREAK",'COMMITTEE','FEEDING','G D S S','SSAUTHRIAL','foto','GSS','L G',
+    "BROKERS", "BROTHERS", "BUREAU","BUTCHERS", "CAFETERIA", "CAMP", "CAPITAL", "CARPET",'ASSCTN','rice',' CO OPERATIVE','PROCESSING','L G C S D P',
+    "CARPETS", "CARS", "CATERING", "CCTU", "CELLULAR", "CEMENT", "CENTER", "CENTRE", "CHALLENGE", "CHAMBERS",'L G R C','J S S',
 })
 
 # Tier 3: Ambiguous — could be a surname or common word; manual review on single match
 TIER_3_AMBIGUOUS = frozenset({
-    'bank', 'bar', 'power','jolly','shop','job','asso','government','embassy',
-    'royal', 'sons', 'model','brothers', 'house', 'mission','bee','authority',
-    'daughters', 'sanctuary','daughter','gifts', 'help', 'new', 'star','good', 
-    'first', 'ideal',"union",'solution','marble','data'
+    'bank', 'bar', 'power','jolly','shop','job','asso','government','embassy','CLAY','court','progress','trustee','annointed','chambers',
+    'royal', 'sons', 'model','brothers', 'house', 'mission','bee','authority','limi','trader',
+    'daughters', 'sanctuary','daughter','gifts', 'help', 'new', 'star','good',"COMPANY",'system','nigeria','club','venture','total','BIRNINKEBBI','press','asso','foto','stock','college',
+    'first', 'ideal',"union",'solution','marble','data','college','future','sellers','conference','east','west','africa','gov','foto','marine','kitchen','carpenter','rice',
+    'business', 'vessel', 'clay', 'doctor', 'engineer', 'trader', 'driver', 'family'
 })
+
+# ---------------------------------------------------------------------------
+
 guarantor_columns_to_clear = [
     'GUARANTORTYPE', 'CORPORATEGUARANTORNAME', 'GUARANTORREGISTRATIONNUMBER',
     'INDIVIDUALGUARANTORSURNAME', 'INDIVIDUALGUARANTORFIRSTNAME', 'INDIVIDUALGUARANTORMIDDLENAME',
@@ -1505,6 +1516,9 @@ sheet_name_mappings = {
     'consumer': 'individualborrowertemplate',
     'consumerborrower': 'individualborrowertemplate',
     'consumertemplate': 'individualborrowertemplate',
+    'Individualinformation': 'individualborrowertemplate',
+    'Individual Information': 'individualborrowertemplate',
+    
     
     # Corporate borrower variations
     'corporateborrowertemplate': 'corporateborrowertemplate',
@@ -1522,6 +1536,7 @@ sheet_name_mappings = {
     'principalofficer': 'principalofficerstemplate',
     'officers': 'principalofficerstemplate',
     'principal': 'principalofficerstemplate',
+    'directorsinformation':'principalofficerstemplate',
     
     # Credit information variations
     'creditinformation': 'creditinformation',
@@ -1536,6 +1551,8 @@ sheet_name_mappings = {
     'guarantorsinfo': 'guarantorsinformation',
     'guarantors': 'guarantorsinformation',
     'guarantor': 'guarantorsinformation',
+    'GuarantorInformation': 'guarantorsinformation',
+    'Guarantor Information': 'guarantorsinformation',
     
     # Merged output variations (typically auto-generated)
     'consumermerged': 'consumermerged',

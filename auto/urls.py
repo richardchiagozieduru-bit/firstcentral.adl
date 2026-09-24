@@ -18,6 +18,8 @@ urlpatterns=[
     path('progress/<int:session_id>/', views.progress_tracking, name='progress_tracking'),
     path('api/progress/<int:session_id>/', views.progress_api, name='progress_api'),
     
-    # Feedback
+    # Feedback & Quota Check
     path('api/feedback/', views.submit_feedback, name='submit_feedback'),
+    path('api/check-quota/', views.check_upload_quota, name='check_quota'),
 ]
+
